@@ -80,6 +80,8 @@ export interface Skill {
   locksRiichi?: boolean;
   /** 你听牌时接管流局罚符结算：屏蔽其他听牌者的罚符收入（暴敛） */
   suppressesRyukyoku?: boolean;
+  /** 突破「必须有役」：拥有此技能时，即使无役也可和牌（按 0 番结算） */
+  forceWin?: boolean;
 }
 
 // ============================================================================

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, step } from '../src/engine';
+import type { Skill } from '../src/index';
 import { baolian, jianying, renjie, wusheng } from '../src/skills';
 import { dummyState, noSkills } from './helpers';
 
@@ -143,6 +144,40 @@ describe('和牌事件携带技能数值（供结算面板显示）', () => {
     const agaru = r.effects.find((e) => e.type === 'agaru');
     if (agaru?.type !== 'agaru') throw new Error('未和牌');
     expect(agaru.skills).toEqual([]);
+  });
+});
+
+describe('无役和牌能力（forceWin，默认关闭）', () => {
+  /** 测试用技能：突破「必须有役」 */
+  const forceWinSkill: Skill = {
+    id: 'test-force-win',
+    name: '无役和牌',
+    desc: '测试用：无役亦可和牌（按 0 番）',
+    forceWin: true,
+  };
+
+  /** 无役形：123m 456m 789p 456p + 南（荣和南，门清荣和不算役） */
+  function noYakuSetup() {
+    const s = dummyState();
+    s.players[0].hand = [1, 2, 3, 4, 5, 6, 17, 18, 19, 14, 15, 16, 32];
+    s.lastDiscard = { player: 1, tile: 32 };
+    return s;
+  }
+
+  it('普通情况：无役不能荣和', () => {
+    const r = step(noYakuSetup(), { type: 'ron', player: 0, tile: 32, from: 1 }, noSkills());
+    expect(r.error).toBeTruthy();
+  });
+
+  it('拥有 forceWin 技能：无役也可荣和，按 0 番结算', () => {
+    const r = step(noYakuSetup(), { type: 'ron', player: 0, tile: 32, from: 1 }, {
+      skillsOf: (seat: number) => (seat === 0 ? [forceWinSkill] : []),
+    });
+    expect(r.error).toBeFalsy();
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    expect(agaru.han).toBe(0); // 0 番和牌
+    expect(agaru.yaku.length).toBeGreaterThan(0); // 仍会标注来源
   });
 });
 

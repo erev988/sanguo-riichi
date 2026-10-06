@@ -297,7 +297,11 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const winner = s.current;
       const hand = s.players[winner].hand;
       const agariPai = hand[hand.length - 1]; // 摸牌在末尾
-      const win = (opts.calcWin ?? winFromState)(s, winner, 'tsumo', agariPai);
+      let win = (opts.calcWin ?? winFromState)(s, winner, 'tsumo', agariPai);
+      // 无役但拥有「无役亦可和」技能 → 按 0 番放行
+      if (!win && (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin)) {
+        win = { kind: 'tsumo', yaku: ['无役和牌（技能）'], han: 0, fu: 30, decomp: null };
+      }
       if (!win) return fail('无役，不能自摸');
       const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win);
       const otherPayments: Payment[] = [];
@@ -331,13 +335,18 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
         s.pendingKakan && s.pendingKakan.player === action.from && s.pendingKakan.tile === action.tile;
       if (!fromDiscard && !fromKakan) return fail('没有可荣和的牌');
       const win = (opts.calcWin ?? winFromState)(s, winner, 'ron', action.tile, !!fromKakan);
-      if (!win) return fail('无役，不能荣和');
-      const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win);
+      let win2 = win;
+      // 无役但拥有「无役亦可和」技能 → 按 0 番放行
+      if (!win2 && (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin)) {
+        win2 = { kind: 'ron', yaku: ['无役和牌（技能）'], han: 0, fu: 30, decomp: null };
+      }
+      if (!win2) return fail('无役，不能荣和');
+      const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win2);
       const otherPayments: Payment[] = [];
       applyOtherAgaruSkills(s, opts, winner, otherPayments); // 他人和牌钩子（妄尊）
       const first = s.agariThisTurn.length === 0; // 頭跳ね：仅第一家和牌者得立直棒/本场
       const payments = [
-        ...computePayments({ ...win, kind: 'ron' }, winner, s.dealer, action.from, {
+        ...computePayments({ ...win2, kind: 'ron' }, winner, s.dealer, action.from, {
           riichiSticks: first ? s.riichiSticks : 0,
           honba: first ? s.round.honba : 0,
           kiriageMangan: s.rules.kiriageMangan,
@@ -349,7 +358,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (first) s.riichiSticks = 0;
       s.agariThisTurn.push(winner);
       clearIppatsu(s);
-      effects.push({ type: 'agaru', winner, kind: 'ron', han: win.han, fu: win.fu, yaku: win.yaku, payments, skills: skillLog });
+      effects.push({ type: 'agaru', winner, kind: 'ron', han: win2.han, fu: win2.fu, yaku: win2.yaku, payments, skills: skillLog });
       effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
       // 不立即结束：等待其他家荣和（一炮多响），由 pass 收尾
       break;
