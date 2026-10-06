@@ -31,19 +31,31 @@ describe('袁绍「乱击」：可无役和牌；无役 -1 番，有役 +1 番',
     if (agaru?.type !== 'agaru') throw new Error('未和牌');
     expect(agaru.han).toBe(0); // 0 + (-1) → 钳制 0，不会是负数
   });
-
-  it('只有宝牌不算「有役」→ 走无役分支（-1 番）', () => {
+  it('速攻流：无役但手握 3 张宝牌 → 3 - 1 = 2 番', () => {
     const s = dummyState();
-    // 同上无役形，但翻开一张宝牌指示牌让手牌有宝牌（宝牌不是役）
+    // 111m 456m 789p 南南南 中中（门清荣和，无役：南在東场不是役牌，中为雀头）
+    s.players[0].hand = [1, 1, 1, 4, 5, 6, 17, 18, 19, 32, 32, 32, 33];
+    s.lastDiscard = { player: 1, tile: 33 };
+    s.doraIndicators = [31]; // 指示東 → 宝牌南（手牌 3 张南）
+    s.doraCount = 1;
+    const r = step(s, { type: 'ron', player: 0, tile: 33, from: 1 }, { skillsOf: LUANJI });
+    expect(r.error).toBeFalsy();
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    // 宝牌 3 番（保留） + 乱击无役 -1 番 = 2 番
+    expect(agaru.han).toBe(2);
+    expect(agaru.yaku).toContain('宝牌');
+    expect(agaru.skills).toEqual([{ skill: '乱击', han: -1, fu: 0 }]);
+  });
+
+  it('无役且无宝牌 → 仍能和牌，番数钳制为 0', () => {
+    const s = dummyState();
     s.players[0].hand = [1, 2, 3, 4, 5, 6, 17, 18, 19, 14, 15, 16, 32];
     s.lastDiscard = { player: 1, tile: 32 };
-    s.doraIndicators = [31]; // 指示東 → 宝牌南（手牌有 1 张南 → 1 张宝牌）
-    s.doraCount = 1;
     const r = step(s, { type: 'ron', player: 0, tile: 32, from: 1 }, { skillsOf: LUANJI });
     const agaru = r.effects.find((e) => e.type === 'agaru');
     if (agaru?.type !== 'agaru') throw new Error('未和牌');
-    // 宝牌 1 张（+1 番）来自宝牌本身；乱击判定为"无役" → -1 番 → 净 0 番
-    expect(agaru.han).toBe(0);
+    expect(agaru.han).toBe(0); // 0 + (-1) → 钳制 0
   });
 
   it('没有乱击的人，无役仍然不能和', () => {

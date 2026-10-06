@@ -297,11 +297,10 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const winner = s.current;
       const hand = s.players[winner].hand;
       const agariPai = hand[hand.length - 1]; // 摸牌在末尾
-      let win = (opts.calcWin ?? winFromState)(s, winner, 'tsumo', agariPai);
-      // 无役但拥有「无役亦可和」技能 → 按 0 番放行
-      if (!win && (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin)) {
-        win = { kind: 'tsumo', yaku: ['无役和牌（技能）'], han: 0, fu: 30, decomp: null };
-      }
+      const allowNoYaku = (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin);
+      const win = opts.calcWin
+        ? opts.calcWin(s, winner, 'tsumo', agariPai)
+        : winFromState(s, winner, 'tsumo', agariPai, false, allowNoYaku);
       if (!win) return fail('无役，不能自摸');
       const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win);
       const otherPayments: Payment[] = [];
@@ -334,12 +333,10 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const fromKakan =
         s.pendingKakan && s.pendingKakan.player === action.from && s.pendingKakan.tile === action.tile;
       if (!fromDiscard && !fromKakan) return fail('没有可荣和的牌');
-      const win = (opts.calcWin ?? winFromState)(s, winner, 'ron', action.tile, !!fromKakan);
-      let win2 = win;
-      // 无役但拥有「无役亦可和」技能 → 按 0 番放行
-      if (!win2 && (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin)) {
-        win2 = { kind: 'ron', yaku: ['无役和牌（技能）'], han: 0, fu: 30, decomp: null };
-      }
+      const allowNoYakuR = (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin);
+      const win2 = opts.calcWin
+        ? opts.calcWin(s, winner, 'ron', action.tile)
+        : winFromState(s, winner, 'ron', action.tile, !!fromKakan, allowNoYakuR);
       if (!win2) return fail('无役，不能荣和');
       const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win2);
       const otherPayments: Payment[] = [];
@@ -861,6 +858,7 @@ function winFromState(
   kind: 'tsumo' | 'ron',
   agariPai: number,
   chankan = false,
+  allowNoYaku = false,
 ): WinInfo | null {
   const p = s.players[seat];
   const juntehai = kind === 'tsumo' ? p.hand.slice(0, -1) : p.hand;
@@ -882,6 +880,7 @@ function winFromState(
     kuitan: true,
     doraIndicators: s.doraIndicators.slice(0, s.doraCount),
     uraIndicators: p.log.riichi ? s.uraIndicators.slice(0, s.doraCount) : undefined,
+    allowNoYaku, // 技能 forceWin：允许无役和牌（宝牌番数照算）
   });
   if (!r) return null;
   if (r.yakumanTotal > 0) {

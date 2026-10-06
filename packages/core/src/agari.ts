@@ -28,6 +28,8 @@ export interface AgariContext {
   doraIndicators?: Tile[];
   /** 里宝牌指示牌（仅立直和牌时计入） */
   uraIndicators?: Tile[];
+  /** 允许无役和牌（技能 forceWin）：无役时也返回结果（保留宝牌番数） */
+  allowNoYaku?: boolean;
 }
 
 export interface AgariYaku {
@@ -198,8 +200,9 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   }
   // 平和不在 YAKU_LIST（由符数阶段处理），单独并入
   if (pinfu) yaku.unshift({ name: '平和', han: 1 });
-  if (yaku.length === 0) return null; // 无役不可和（宝牌本身不算役）
-  addDora(ctx, all, yaku); // 有役后追加宝牌番数
+  // 无役不可和 —— 除非技能放行（forceWin：允许无役和牌，宝牌番数照算）
+  if (yaku.length === 0 && !ctx.allowNoYaku) return null;
+  addDora(ctx, all, yaku); // 宝牌番数照加（宝牌不构成役，但计入番数）
 
   // 符数（平和：门清荣和 30 符 / 自摸 20 符）
   const fu = pinfu ? (ctx.menzen && !ctx.isTsumo ? 30 : 20) : calcFu(ctx, decomps);
