@@ -1,0 +1,8 @@
+# 依赖与产物
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# 参考仓库（riichi-core 上游源码，仅本地对照用，不入库）
+ref/
