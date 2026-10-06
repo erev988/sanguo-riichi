@@ -1382,3 +1382,87 @@ button.riichi.active {
   color: #8a2a22;
   font-size: 12.5px;
 }
+
+/* ============================================================================
+   布局优化：手牌做成透明浮层 → 牌桌铺满整屏；副露固定到右下角
+   ========================================================================== */
+
+.table {
+  /* 底部为手牌浮层预留高度 */
+  padding-bottom: 106px;
+  position: relative;
+}
+
+/* 自己：绝对定位的透明浮层（不参与牌桌布局，因此牌桌高度稳定） */
+.seat.self {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  padding: 0 10px;
+  gap: 3px;
+  background: transparent; /* 透明：可直接看到背后的牌桌与牌河 */
+  border: none;
+  box-shadow: none;
+  pointer-events: none; /* 仅按钮/牌可点，空白处不挡牌桌 */
+}
+
+.seat.self .controls,
+.seat.self .row.hand {
+  pointer-events: auto;
+}
+
+/* 自己区域仍然允许高亮“轮到你”，但不加边框 */
+.seat.self.turn {
+  border: none;
+}
+
+/* 手牌行：不换行、居中、透明 */
+.seat.self .row.hand {
+  background: transparent;
+  justify-content: center;
+  flex-wrap: nowrap;
+  overflow: visible;
+  height: auto;
+  align-items: center;
+  gap: 3px;
+  /* 卡牌轻微投影，帮助从牌桌上“浮起来” */
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55));
+}
+
+/* 右下角：自己的副露（吃/碰/杠） */
+.self-melds {
+  position: absolute;
+  right: 10px;
+  bottom: 96px;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+/* 中间区域因此获得更大空间：左右牌河更高，不再被裁 */
+.center {
+  min-height: 0;
+}
+
+.river-left,
+.river-right {
+  max-height: 100%;
+}
+
+/* 牌桌改为两行（self 已是绝对定位浮层，不再占 grid 行）→ 全部高度给牌河 */
+.table {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    'top    top    top'
+    'left   center right';
+}
+
+/* 对家区域压缩一点，中间牌河更高 */
+.seat.top {
+  padding: 2px 4px;
+}

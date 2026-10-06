@@ -1041,7 +1041,20 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <!-- 自己：操作按钮在上，副露与手牌在下（均居中） -->
+        <!-- 右下角：自己的吃/碰/杠（固定位置，不占手牌空间） -->
+        <div v-if="shown.melds[seats.self].length > 0" class="self-melds">
+          <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
+            <TileSprite
+              v-for="(t, j) in m.tiles"
+              :key="j"
+              :tile="t"
+              :rotated="isCalled(m, j)"
+              :size="22"
+            />
+          </span>
+        </div>
+
+        <!-- 自己：透明浮层（按钮 + 手牌），不挤占牌桌空间 -->
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
           <div v-if="!replayActive" class="controls">
             <button
@@ -1060,17 +1073,6 @@ onBeforeUnmount(() => {
             >
               {{ optionLabel(a) }}
             </button>
-          </div>
-          <div class="row melds">
-            <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
-              <TileSprite
-                v-for="(t, j) in m.tiles"
-                :key="j"
-                :tile="t"
-                :rotated="isCalled(m, j)"
-                :size="26"
-              />
-            </span>
           </div>
           <div class="row hand">
             <TileSprite
