@@ -220,6 +220,20 @@ export const wanglie: Skill = {
   },
 };
 
+// ---------- 袁绍「乱击」（群）：可无役和牌；无役 -1 番，有役 +1 番 ----------
+export const luanji: Skill = {
+  id: 'luanji',
+  name: '乱击',
+  desc: '你可以无役和牌；无役和牌时番数 -1，若手中有役则和牌番数 +1。',
+  forceWin: true,
+  onAgaru: (ctx) => {
+    // 宝牌 / 里宝牌 / 赤宝牌 不算「役」；技能放行的无役和牌同样不算
+    const notYaku = new Set(['宝牌', '里宝牌', '赤宝牌', '无役和牌（技能）']);
+    const hasYaku = ctx.winInfo.yaku.some((y) => !notYaku.has(y));
+    ctx.winInfo.han += hasYaku ? 1 : -1;
+  },
+};
+
 // ---------- 夏侯惇「刚烈」（魏）：弃牌不可被鸣 ----------
 export const ganglie: Skill = {
   id: 'ganglie',

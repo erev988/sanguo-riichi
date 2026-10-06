@@ -3,6 +3,7 @@ import {
   baolian,
   ganglie,
   jianying,
+  luanji,
   renjie,
   tuxi,
   wanglie,
@@ -64,6 +65,14 @@ export const GENERAL_YUANSHU: General = {
   skills: [wangzun],
 };
 
+export const GENERAL_YUANSHAO: General = {
+  id: 'gen-yuanshao',
+  name: '袁绍',
+  faction: 'qun',
+  desc: '技能「乱击」：你可以无役和牌；无役和牌时番数 -1，若手中有役则和牌番数 +1。',
+  skills: [luanji],
+};
+
 export const GENERAL_DONGZHUO: General = {
   id: 'gen-dongzhuo',
   name: '董卓',
@@ -105,6 +114,7 @@ export const ALL_GENERALS: General[] = [
   GENERAL_SIMAYI,
   GENERAL_ZHANGLIAO,
   GENERAL_YUANSHU,
+  GENERAL_YUANSHAO,
   GENERAL_DONGZHUO,
   GENERAL_SUNQUAN,
   GENERAL_CHENDAO,
