@@ -585,8 +585,9 @@ function applyAgaruSkills(
     const df = win.fu - beforeFu;
     if (dh !== 0 || df !== 0) skillLog.push({ skill: sk.name, han: dh, fu: df });
   }
-  // 技能减番下限为 1 番：日麻和牌至少 1 番，技能不应把和牌"扣没"
-  if (win.han < 1) win.han = 1;
+  // 技能减番下限为 0：按设定「暴敛」等技能可以把番数扣到 0 番 —— 此时仍可和牌
+  //（役种依然存在，只是番数为 0；和牌者照常收走场上全部立直棒）
+  if (win.han < 0) win.han = 0;
   return { payments, skillLog };
 }
 

@@ -114,19 +114,24 @@ describe('和牌事件携带技能数值（供结算面板显示）', () => {
     expect(agaru.skills).toEqual([{ skill: '武圣', han: 3, fu: 0 }]);
   });
 
-  it('技能减番有下限 1 番（暴敛 -2 番不会把和牌扣成 0 番）', () => {
+  it('技能可把番数扣到 0 番：0 番仍可和牌，且照常收走立直棒（以技能为准）', () => {
     const s = dummyState();
     s.turnCount = 20;
     s.awaiting = 'discard';
-    // 立直（1 番）+ 门清自摸（1 番）= 2 番；暴敛 >12 张 -2 → 本会变 0，应钳制为 1
+    // 立直（1 番）+ 门清自摸（1 番）= 2 番；暴敛 >12 张 -2 → 0 番（仍可和）
     // 手牌：123m 456p 567s 南南南 中中（无断幺/三色/平和/役牌）
     s.players[0].log.riichi = true;
     s.players[0].log.discards = 14;
     s.players[0].hand = [1, 2, 3, 14, 15, 16, 25, 26, 27, 32, 32, 32, 33, 33];
+    s.riichiSticks = 2; // 场上还有 2 根立直棒（含自己的）
     const r = step(s, { type: 'tsumo' }, { skillsOf: (seat: number) => (seat === 0 ? [baolian] : []) });
     const agaru = r.effects.find((e) => e.type === 'agaru');
     if (agaru?.type !== 'agaru') throw new Error('未和牌');
-    expect(agaru.han).toBe(1); // 下限 1 番，绝不是 0
+    expect(agaru.han).toBe(0); // 技能扣到 0 番，仍然和牌
+    expect(agaru.yaku.length).toBeGreaterThan(0); // 役种依然存在
+    // 立直棒（2 根 = 2000）全部收归和牌者
+    expect(agaru.payments.some((p) => p.from === -1 && p.to === 0 && p.amount === 2000)).toBe(true);
+    expect(r.state.riichiSticks).toBe(0);
   });
 
   it('无技能时不产生技能记录', () => {
