@@ -326,10 +326,100 @@ button.ron:hover {
   letter-spacing: 0.12em;
 }
 
+/* 中央场：风位 / 宝牌 / 剩余 */
+.field .wind-row {
+  display: flex;
+  gap: 4px;
+  font-size: 11px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.field .wind-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--paper);
+}
+
+.field .wind-chip em {
+  font-style: normal;
+  color: var(--cinnabar);
+  font-size: 10px;
+}
+
+.field .dora-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.field .dora-row .label {
+  color: var(--paper-dim);
+}
+
+/* 座位风位标记 */
+.seat header .who em.wind {
+  font-style: normal;
+  color: var(--brass);
+  margin-right: 3px;
+}
+
+/* ---------- 移动端：竖屏提示横屏 ---------- */
+.rotate-hint {
+  display: none;
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  .table,
+  .replay-bar,
+  .topbar {
+    display: none;
+  }
+  .rotate-hint {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 16px;
+    letter-spacing: 0.16em;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+}
+
+/* 横屏手机：整体压缩，保证牌桌不溢出 */
+@media (orientation: landscape) and (max-height: 480px) {
+  .app {
+    padding: 6px 8px 12px;
+    max-width: 100%;
+  }
+  h1 {
+    font-size: 15px;
+    margin: 2px 0 6px;
+  }
+  .table {
+    gap: 6px;
+    padding: 8px;
+  }
+  .seat {
+    padding: 4px 6px;
+    min-height: 48px;
+  }
+}`
+
 /* ---------- 自己的手牌 ---------- */
 .row.hand {
   gap: 3px;
   margin: 5px 0 2px;
+  flex-wrap: nowrap; /* 手牌必须一整条，不换行 */
+  justify-content: center;
+  overflow: hidden;
 }
 
 .row.hand .tile {

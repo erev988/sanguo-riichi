@@ -58,6 +58,16 @@ const ended = ref(false);
 const reason = ref('');
 const pendingDiscard = ref<{ player: number; tile: Tile; chankan: boolean } | null>(null);
 const lastDrawn = ref<Tile | null>(null);
+/** 自己当前可执行的动作（服务器下发） */
+const myOptions = ref<Action[]>([]);
+/** 宝牌指示牌（已翻开） */
+const doraIndicators = ref<Tile[]>([]);
+/** 牌山剩余张数 */
+const wallCount = ref(0);
+/** 本局庄家座位 */
+const dealer = ref(0);
+/** 视口宽度（手牌自适应缩放，保证一整条不换行） */
+const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
 
 // ---- 结算面板 ----
 interface ResultInfo {
@@ -125,10 +135,27 @@ const liveFrame = computed<Frame>(() => ({
 const replayFrame = computed<Frame | null>(() => replayFrames.value[replayIdx.value] ?? null);
 const shown = computed<Frame>(() => (replayActive.value ? (replayFrame.value ?? liveFrame.value) : liveFrame.value));
 
+/** 手牌主体（不含刚摸的牌），并按牌面排序（万→饼→索→字；赤 5 归入 5 的位置） */
 const handCore = computed(() => {
   const h = shown.value.hands[mySeat.value ?? 0] ?? [];
-  return shown.value.lastDrawn != null ? h.slice(0, -1) : h;
+  const body = shown.value.lastDrawn != null ? h.slice(0, -1) : h;
+  const norm = (t: Tile): number => (t === 0 ? 5 : t === 10 ? 15 : t === 20 ? 25 : t);
+  return [...body].sort((a, b) => norm(a) - norm(b));
 });
+
+/** 手牌牌高：随视口与张数自适应，保证 13/14 张始终一整条 */
+const handTileSize = computed(() => {
+  const n = Math.max(13, (handCore.value.length ?? 13) + 1);
+  return Math.max(28, Math.min(58, Math.floor((vw.value - 72) / n)));
+});
+
+/** 风位：庄家为东，逆时针（座位号 +1）依次 南西北 */
+function windOf(seat: number): string {
+  return ['东', '南', '西', '北'][(((seat - dealer.value) % 4) + 4) % 4];
+}
+
+/** 该座位是否庄家 */
+const isDealer = (seat: number): boolean => seat === dealer.value;
 
 function memberName(seat: number, face = 'P'): string {
   const m = roomMembers.value.find((x) => x.seat === seat);
@@ -231,6 +258,15 @@ function handleEffect(e: GameEffect): void {
     case 'hand':
       if (e.player === mySeat.value) hand.value = e.tiles;
       break;
+    case 'options':
+      if (e.targetSeat === mySeat.value) myOptions.value = e.actions;
+      break;
+    case 'dora':
+      doraIndicators.value = e.indicators;
+      break;
+    case 'wall':
+      wallCount.value = e.count;
+      break;
     case 'drawn':
       if (e.player === mySeat.value) lastDrawn.value = e.tile;
       break;
@@ -247,6 +283,7 @@ function handleEffect(e: GameEffect): void {
         sfx.discard();
       }
       if (e.player === mySeat.value) lastDrawn.value = null;
+      myOptions.value = []; // 等待服务器下发新的可选动作
       if (e.player !== mySeat.value) {
         pendingDiscard.value = { player: e.player, tile: e.tile, chankan: false };
       }
@@ -369,6 +406,9 @@ function handleMsg(msg: ServerMsg): void {
       riichiFlags.value = st.players.map((p) => p.log.riichi);
       currentSeat.value = st.current;
       riichiSticks.value = st.riichiSticks;
+      dealer.value = st.dealer;
+      doraIndicators.value = st.doraIndicators.slice(0, st.doraCount ?? 0);
+      wallCount.value = st.wall?.length ?? 0;
       [roundText.value, honbaText.value] = roundLabel(st.round);
       roomStarted.value = true;
       break;
@@ -386,12 +426,16 @@ function loadReplay(data: ReplayData): void {
   const frames: Frame[] = [];
   let acc: string[] = [];
   const nameOf = (s: number): string => data.seats[s]?.name ?? `P${s + 1}`;
+  let dora: Tile[] = [];
+  let wallN = 0;
   replayGame(data, (state, effects) => {
     for (const e of effects) {
       const line = describe(e, nameOf);
       if (line) {
         acc = [line, ...acc].slice(0, 200);
       }
+      if (e.type === 'dora') dora = e.indicators;
+      if (e.type === 'wall') wallN = e.count;
     }
     const [rt, ht] = roundLabel(state.round);
     frames.push({
@@ -488,6 +532,39 @@ function act(action: Action): void {
   net.send({ t: 'act', action, seq: ++net.seq });
 }
 
+/** 按钮文案 */
+function optionLabel(a: Action): string {
+  switch (a.type) {
+    case 'tsumo':
+      return '自摸';
+    case 'ron':
+      return `荣和 ${tileName(a.tile)}`;
+    case 'chii':
+      return `吃 ${a.tiles.map(tileName).join('')}`;
+    case 'pon':
+      return `碰 ${tileName(a.tile)}`;
+    case 'kan':
+      return `杠 ${tileName(a.tile)}`;
+    case 'ankan':
+      return `暗杠 ${tileName(a.tile)}`;
+    case 'kakan':
+      return `加杠 ${tileName(a.tile)}`;
+    case 'kyuushu':
+      return '九种九牌';
+    case 'pass':
+      return '过';
+    default:
+      return a.type;
+  }
+}
+
+/** 执行服务器下发的可选动作（摸牌/打牌不出现在按钮里） */
+function doOption(a: Action): void {
+  if (a.type === 'draw' || a.type === 'discard') return;
+  act(a);
+  myOptions.value = [];
+}
+
 function discardTile(t: Tile): void {
   if (ended.value || replayActive.value) return;
   act({ type: 'discard', tile: t });
@@ -509,7 +586,13 @@ watch(soundOn, (v) => {
   sfx.enabled = v;
 });
 
+function onResize(): void {
+  vw.value = window.innerWidth;
+}
+if (typeof window !== 'undefined') window.addEventListener('resize', onResize);
+
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') window.removeEventListener('resize', onResize);
   if (replayTimer) clearInterval(replayTimer);
   net.close();
 });
@@ -592,7 +675,7 @@ onBeforeUnmount(() => {
       <div v-else class="table">
         <section class="seat top" :class="{ turn: shown.current === seats.top }">
           <header>
-            <span class="who">{{ memberName(seats.top) }}<span v-if="shown.riichi[seats.top]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<span v-if="shown.riichi[seats.top]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.top] }}</span>
           </header>
           <div class="row backs">
@@ -607,7 +690,7 @@ onBeforeUnmount(() => {
 
         <section class="seat left" :class="{ turn: shown.current === seats.left }">
           <header>
-            <span class="who">{{ memberName(seats.left) }}<span v-if="shown.riichi[seats.left]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<span v-if="shown.riichi[seats.left]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.left] }}</span>
           </header>
           <div class="row backs">
@@ -645,8 +728,16 @@ onBeforeUnmount(() => {
               </div>
               <div class="field">
                 <span class="big">{{ shown.roundText }}</span>
-                <span>{{ shown.honbaText || '无本场' }}</span>
-                <span>供托 {{ shown.riichiSticks }}</span>
+                <span class="wind-row">
+                  <span v-for="s in [seats.self, seats.right, seats.top, seats.left]" :key="s" class="wind-chip">
+                    {{ windOf(s) }}<em v-if="isDealer(s)">庄</em>
+                  </span>
+                </span>
+                <span class="dora-row">
+                  <span class="label">宝牌</span>
+                  <TileSprite v-for="(t, i) in doraIndicators" :key="i" :tile="t" :size="22" />
+                </span>
+                <span>剩 {{ wallCount }} 张</span>
               </div>
               <div class="ring-col">
                 <TileSprite
@@ -674,7 +765,7 @@ onBeforeUnmount(() => {
 
         <section class="seat right" :class="{ turn: shown.current === seats.right }">
           <header>
-            <span class="who">{{ memberName(seats.right) }}<span v-if="shown.riichi[seats.right]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<span v-if="shown.riichi[seats.right]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.right] }}</span>
           </header>
           <div class="row backs">
@@ -689,7 +780,7 @@ onBeforeUnmount(() => {
 
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
           <header>
-            <span class="who">你 · {{ currentGeneral?.name }}<span v-if="shown.riichi[seats.self]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.self) }}</em>你 · {{ currentGeneral?.name }}<span v-if="shown.riichi[seats.self]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.self] }}</span>
           </header>
           <div class="row melds">
@@ -698,22 +789,30 @@ onBeforeUnmount(() => {
             </span>
           </div>
           <div class="row hand">
-            <TileSprite v-for="(t, i) in handCore" :key="i" :tile="t" :size="58" @click="discardTile(t)" />
+            <TileSprite
+              v-for="(t, i) in handCore"
+              :key="i"
+              :tile="t"
+              :size="handTileSize"
+              @click="discardTile(t)"
+            />
             <TileSprite
               v-if="shown.lastDrawn != null"
               class="just-drawn"
               :tile="shown.lastDrawn"
-              :size="58"
+              :size="handTileSize"
               @click="discardTile(shown.lastDrawn)"
             />
           </div>
           <div v-if="!replayActive" class="controls">
-            <button @click="act({ type: 'draw' })">摸牌</button>
-            <button @click="act({ type: 'tsumo' })">自摸</button>
-            <button v-if="pendingDiscard" class="ron" @click="ron()">
-              荣和 {{ tileName(pendingDiscard.tile) }}{{ pendingDiscard.chankan ? '（抢杠）' : '' }}
+            <button
+              v-for="(a, i) in myOptions"
+              :key="i"
+              :class="{ ron: a.type === 'ron', strong: a.type === 'tsumo' }"
+              @click="doOption(a)"
+            >
+              {{ optionLabel(a) }}
             </button>
-            <button v-if="pendingDiscard" @click="pass()">过</button>
           </div>
         </section>
       </div>
@@ -724,6 +823,12 @@ onBeforeUnmount(() => {
         <p v-for="(l, i) in shown.logs" :key="i">{{ l }}</p>
       </div>
     </template>
+
+    <!-- 移动端：竖屏请旋转（横屏才不拥挤） -->
+    <div class="rotate-hint">
+      <span style="font-size: 28px">🀄</span>
+      <span>请将手机横屏游玩</span>
+    </div>
 
     <!-- 结算面板（卷轴） -->
     <div v-if="result" class="modal-mask" @click.self="result = null">

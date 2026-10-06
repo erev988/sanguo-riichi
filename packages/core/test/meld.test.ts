@@ -92,13 +92,13 @@ describe('暗杠', () => {
     const s = dummyState();
     s.awaiting = 'discard';
     s.players[0].hand = [5, 5, 5, 5, 2, 3, 4, 14, 15, 16, 31, 31, 35, 36]; // 4 张 5m
-    const wallBefore = s.wall.length;
+    const rinshanBefore = s.rinshanWall.length;
     const r = step(s, { type: 'ankan', player: 0, tile: 5 }, noSkills());
     expect(r.error).toBeFalsy();
     expect(r.state.players[0].openMelds[0].type).toBe('ankan');
     expect(r.state.players[0].openMelds[0].tiles).toEqual([5, 5, 5, 5]);
     expect(r.state.players[0].hand.length).toBe(11); // 14 - 4 + 1（岭上）
-    expect(r.state.wall.length).toBe(wallBefore - 1);
+    expect(r.state.rinshanWall.length).toBe(rinshanBefore - 1); // 岭上摸
     expect(r.state.awaiting).toBe('discard');
   });
 

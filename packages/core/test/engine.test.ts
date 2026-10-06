@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { step } from '../src/engine';
+import { createGame, step } from '../src/engine';
 import { jianying, renjie, wusheng } from '../src/skills';
 import { dummyState, noSkills } from './helpers';
 
@@ -14,10 +14,16 @@ function skillsOf(seat: number) {
 }
 
 describe('引擎：摸打流转', () => {
-  it('配牌每人 13 张，牌山剩 84 张（136 - 52）', () => {
-    const s = dummyState();
+  it('配牌每人 13 张，可摸牌山 70 张 + 王牌 14（岭上4/宝牌5/里宝5）', () => {
+    const s = createGame(
+      [0, 1, 2, 3].map((i) => ({ name: `P${i}`, generalId: 'gen-guanyu', isAI: false })),
+      { seed: 42 },
+    );
     expect(s.players.every((p) => p.hand.length === 13)).toBe(true);
-    expect(s.wall.length).toBe(84);
+    expect(s.wall.length).toBe(70);
+    expect(s.rinshanWall.length).toBe(4);
+    expect(s.doraIndicators.length).toBe(5);
+    expect(s.uraIndicators.length).toBe(5);
   });
 
   it('摸牌 + 打牌会推进回合并计数弃牌', () => {

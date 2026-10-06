@@ -36,26 +36,36 @@ export interface StepResult {
 
 const DEFAULT_INITIAL_SCORE = 25000;
 
+/** 宝牌：指示牌 → 实际宝牌（数牌 +1，风 东→南→西→北→东，三元 白→发→中→白） */
+export { doraFromIndicator, countDora, countAka } from './types';
+
 export function createGame(
   seats: SeatConfig[],
   opts: { seed?: number; round?: RoundInfo; initialScore?: number; rules?: Partial<Rules> } = {},
 ): GameState {
   const seed = opts.seed ?? 20240101;
   const rng = mulberry32(seed);
-  const wall = buildWall(rng);
+  const all = buildWall(rng);
   const rules = resolveRules(opts.rules);
+  // 配牌 52 张后，余下 84 张中拆出「王牌」14 张：岭上 4 + 宝牌指示牌 5 + 里宝牌指示牌 5
+  const dealt = all.splice(0, 52);
+  const wangpai = all.splice(-14);
   return {
     version: 0,
     round: opts.round ?? { wind: 'east', round: 1, honba: 0 },
     dealer: 0,
-    wall,
+    wall: all, // 70 张可摸
+    rinshanWall: wangpai.slice(0, 4),
+    doraIndicators: wangpai.slice(4, 9),
+    uraIndicators: wangpai.slice(9, 14),
+    doraCount: 1, // 开局翻开 1 张宝牌指示牌
     players: seats.map((s, i) => ({
       seat: i,
       name: s.name,
       generalId: s.generalId,
       isAI: s.isAI,
       score: opts.initialScore ?? rules.initialScore,
-      hand: wall.splice(0, 13),
+      hand: dealt.slice(i * 13, i * 13 + 13),
       openMelds: [],
       discards: [],
       log: { discards: 0, discardTiles: [], calledCount: 0, riichi: false, ippatsu: false, tenpai: false },
@@ -206,6 +216,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (s.wall.length === 0) s.isHaitei = true; // 摸完牌山最后一张（海底摸月）
       s.awaiting = 'discard';
       effects.push({ type: 'drawn', player: s.current, tile, targetSeat: s.current });
+      effects.push({ type: 'wall', count: s.wall.length });
       effects.push({
         type: 'hand',
         player: s.current,
@@ -463,14 +474,17 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const meld: Meld = { type: 'ankan', tiles: [action.tile, action.tile, action.tile, action.tile] };
       p.openMelds.push(meld);
       effects.push({ type: 'called', player: me, from: me, meld, handCount: p.hand.length });
-      // 岭上摸牌（骨架简化：从牌山末尾补一张）
-      if (s.wall.length > 0) {
-        const rinshan = s.wall.pop()!;
+      // 岭上摸牌（从岭上区取牌）
+      if (s.rinshanWall.length > 0) {
+        const rinshan = s.rinshanWall.pop()!;
         p.hand.push(rinshan);
         s.rinshan = true; // 岭上开花标志
         effects.push({ type: 'drawn', player: me, tile: rinshan, targetSeat: me });
       }
       effects.push({ type: 'hand', player: me, tiles: [...p.hand], targetSeat: me });
+      // 杠后翻开新宝牌
+      if (s.doraCount < 5) s.doraCount += 1;
+      effects.push({ type: 'dora', indicators: s.doraIndicators.slice(0, s.doraCount) });
       // 抢杠窗口：暗杠仅国士无双可抢
       s.pendingKakan = { player: me, tile: action.tile, kind: 'ankan' };
       effects.push({ type: 'chankan-window', player: me, tile: action.tile, kind: 'ankan' });
@@ -504,15 +518,18 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       p.hand.splice(i, 1);
       meld.type = 'kakan';
       meld.tiles = [action.tile, action.tile, action.tile, action.tile];
-      // 岭上摸牌
-      if (s.wall.length > 0) {
-        const rinshan = s.wall.pop()!;
+      // 岭上摸牌（从岭上区取牌）
+      if (s.rinshanWall.length > 0) {
+        const rinshan = s.rinshanWall.pop()!;
         p.hand.push(rinshan);
         s.rinshan = true; // 岭上开花标志
         effects.push({ type: 'drawn', player: me, tile: rinshan, targetSeat: me });
       }
       effects.push({ type: 'called', player: me, from: me, meld, handCount: p.hand.length });
       effects.push({ type: 'hand', player: me, tiles: [...p.hand], targetSeat: me });
+      // 杠后翻开新宝牌
+      if (s.doraCount < 5) s.doraCount += 1;
+      effects.push({ type: 'dora', indicators: s.doraIndicators.slice(0, s.doraCount) });
       // 抢杠窗口：加杠任意家可抢
       s.pendingKakan = { player: me, tile: action.tile, kind: 'kakan' };
       effects.push({ type: 'chankan-window', player: me, tile: action.tile, kind: 'kakan' });
@@ -838,6 +855,8 @@ function winFromState(
     bakaze: WIND_TILE[s.round.wind], // 场风由局信息决定
     jikaze: 31 + ((seat - s.dealer + 4) % 4), // 自风 = 庄家起顺时针
     kuitan: true,
+    doraIndicators: s.doraIndicators.slice(0, s.doraCount),
+    uraIndicators: p.log.riichi ? s.uraIndicators.slice(0, s.doraCount) : undefined,
   });
   if (!r) return null;
   if (r.yakumanTotal > 0) {

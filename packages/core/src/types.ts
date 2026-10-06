@@ -107,14 +107,50 @@ export interface RoundInfo {
   honba: number;
 }
 
+// ---- 宝牌 ----
+
+/** 宝牌：指示牌 → 实际宝牌（数牌 +1，风 东→南→西→北→东，三元 白→发→中→白） */
+export function doraFromIndicator(indicator: Tile): Tile {
+  if (indicator >= 1 && indicator <= 9) return indicator === 9 ? 1 : indicator + 1; // 万
+  if (indicator >= 10 && indicator <= 19) return indicator === 19 ? 11 : indicator + 1; // 饼
+  if (indicator >= 20 && indicator <= 29) return indicator === 29 ? 21 : indicator + 1; // 索
+  if (indicator >= 31 && indicator <= 34) return indicator === 34 ? 31 : indicator + 1; // 风
+  if (indicator >= 35 && indicator <= 37) return indicator === 37 ? 35 : indicator + 1; // 三元
+  return indicator;
+}
+
+/** 统计一组牌中的宝牌张数（赤宝牌按其牌面 5 计入） */
+export function countDora(tiles: Tile[], indicators: Tile[]): number {
+  const doraSet = indicators.map(doraFromIndicator);
+  let n = 0;
+  for (const t of tiles) {
+    const normalized = t === 0 ? 5 : t === 10 ? 15 : t === 20 ? 25 : t; // 赤 5 视作 5
+    if (doraSet.includes(normalized)) n++;
+  }
+  return n;
+}
+
+/** 赤宝牌张数 */
+export function countAka(tiles: Tile[]): number {
+  return tiles.filter((t) => t === 0 || t === 10 || t === 20).length;
+}
+
 export interface GameState {
   /** 状态版本号：每次 step 递增，用于快照 / 断线重连补偿 */
   version: number;
   round: RoundInfo;
   /** 本局庄家座位 */
   dealer: number;
-  /** 牌山（服务器私有，不下发客户端） */
+  /** 可摸牌山（服务器私有），剩余张数会作为公开信息广播 */
   wall: Tile[];
+  /** 岭上牌（杠后补牌，4 张，服务器私有） */
+  rinshanWall: Tile[];
+  /** 宝牌指示牌（5 张，按翻开顺序；公开信息） */
+  doraIndicators: Tile[];
+  /** 里宝牌指示牌（5 张，仅立直和牌者可见） */
+  uraIndicators: Tile[];
+  /** 已翻开的宝牌指示牌数量（初始 1，每次杠 +1） */
+  doraCount: number;
   players: PlayerState[];
   /** 当前行动座位 */
   current: number;

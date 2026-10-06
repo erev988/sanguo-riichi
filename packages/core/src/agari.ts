@@ -1,5 +1,5 @@
 import { YAKU_LIST, YAKUMAN_LIST, type YakuContext } from './yaku';
-import type { Meld, Tile } from './types';
+import { countAka, countDora, type Meld, type Tile } from './types';
 
 // ============================================================================
 // 和牌判定（agari.ls 的转写 + 自研拆解）
@@ -24,6 +24,10 @@ export interface AgariContext {
   kuitan: boolean;
   /** 双重役满开关（默认 2） */
   yakumanMax?: number;
+  /** 已翻开的宝牌指示牌（公开信息） */
+  doraIndicators?: Tile[];
+  /** 里宝牌指示牌（仅立直和牌时计入） */
+  uraIndicators?: Tile[];
 }
 
 export interface AgariYaku {
@@ -133,6 +137,18 @@ function isPinfu(ctx: AgariContext, decomps: WinDecomp[]): boolean {
   });
 }
 
+/** 追加宝牌 / 里宝牌 / 赤宝牌番数（宝牌不构成役，因此只在已有役时追加） */
+function addDora(ctx: AgariContext, tehai: Tile[], yaku: AgariYaku[]): void {
+  const dora = countDora(tehai, ctx.doraIndicators ?? []);
+  if (dora > 0) yaku.push({ name: '宝牌', han: dora });
+  if (ctx.riichi.accepted && ctx.uraIndicators) {
+    const ura = countDora(tehai, ctx.uraIndicators);
+    if (ura > 0) yaku.push({ name: '里宝牌', han: ura });
+  }
+  const aka = countAka(tehai);
+  if (aka > 0) yaku.push({ name: '赤宝牌', han: aka });
+}
+
 /** 和牌判定主入口 */
 export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   const all: Tile[] = [...ctx.juntehai, ctx.agariPai];
@@ -143,6 +159,7 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   if (isChiitoi(c14)) {
     const yakuCtx = makeYakuContext(ctx, all, c14, [], true, false);
     const yaku = collectYaku(yakuCtx);
+    addDora(ctx, all, yaku);
     return {
       yaku,
       hanTotal: yaku.reduce((a, x) => a + x.han, 0),
@@ -181,7 +198,8 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   }
   // 平和不在 YAKU_LIST（由符数阶段处理），单独并入
   if (pinfu) yaku.unshift({ name: '平和', han: 1 });
-  if (yaku.length === 0) return null; // 无役不可和
+  if (yaku.length === 0) return null; // 无役不可和（宝牌本身不算役）
+  addDora(ctx, all, yaku); // 有役后追加宝牌番数
 
   // 符数（平和：门清荣和 30 符 / 自摸 20 符）
   const fu = pinfu ? (ctx.menzen && !ctx.isTsumo ? 30 : 20) : calcFu(ctx, decomps);

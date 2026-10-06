@@ -1,3 +1,4 @@
+import type { Action } from './actions';
 import type { Meld, RoundInfo, Tile } from './types';
 
 /** 单笔点棒转移（from/to 可为 -1 表示“流局基金”，见流局结算） */
@@ -31,6 +32,12 @@ export type GameEffect =
   | { type: 'passed' }
   /** 技能触发的点棒转移（如「突袭」副露收费） */
   | { type: 'skill-pay'; skill: string; payments: Payment[] }
+  /** 已翻开的宝牌指示牌（公开信息） */
+  | { type: 'dora'; indicators: Tile[] }
+  /** 牌山剩余张数（公开信息） */
+  | { type: 'wall'; count: number }
+  /** 该座位当前可执行的动作（私有，用于渲染吃/碰/杠/荣和按钮） */
+  | { type: 'options'; actions: Action[]; targetSeat: number }
   | { type: 'scores'; scores: number[] }
   | {
       type: 'agaru';

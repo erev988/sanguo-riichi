@@ -11,12 +11,12 @@ describe('加杠（kakan）', () => {
     s.awaiting = 'discard';
     s.players[0].openMelds = [{ type: 'pon', tiles: [5, 5, 5], from: 1 }];
     s.players[0].hand = [5, 2, 3, 4, 14, 15, 16, 24, 25, 26, 31, 31, 35];
-    const wallBefore = s.wall.length;
+    const rinshanBefore = s.rinshanWall.length;
     const r = step(s, { type: 'kakan', player: 0, tile: 5 }, noSkills());
     expect(r.error).toBeFalsy();
     expect(r.state.players[0].openMelds[0].type).toBe('kakan');
     expect(r.state.players[0].openMelds[0].tiles.length).toBe(4);
-    expect(r.state.wall.length).toBe(wallBefore - 1); // 岭上摸
+    expect(r.state.rinshanWall.length).toBe(rinshanBefore - 1); // 岭上摸
     expect(r.state.pendingKakan).toEqual({ player: 0, tile: 5, kind: 'kakan' });
   });
 

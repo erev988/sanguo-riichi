@@ -5,6 +5,7 @@ import {
   canRon,
   createGame,
   generalById,
+  legalActions,
   resolveRules,
   step,
   type Action,
@@ -51,6 +52,7 @@ export class Room {
   private currentActions: { seat: number; action: Action }[] = [];
   private roundStart?: { round: RoundInfo; dealer: number };
   private aiTimer?: ReturnType<typeof setTimeout>;
+  private drawTimer?: ReturnType<typeof setTimeout>;
   private ronTimer?: ReturnType<typeof setTimeout>;
   private nextTimer?: ReturnType<typeof setTimeout>;
   private started = false;
@@ -236,6 +238,44 @@ export class Room {
     } else {
       this.scheduleAI();
     }
+    this.broadcastOptions(); // 下发各座位当前可选动作（吃/碰/杠/荣和/自摸…）
+  }
+
+  /** 给每位真人单播其当前可执行动作（AI 不需要） */
+  private broadcastOptions(): void {
+    if (!this.state || this.state.phase !== 'playing') return;
+    const st = this.state;
+    const all = legalActions(st);
+    for (let seat = 0; seat < 4; seat++) {
+      const m = this.members.get(seat);
+      if (!m || m.isAI) continue;
+      const acts = all.filter((a) => {
+        const p = (a as { player?: number }).player;
+        if (p != null) return p === seat; // 副露/荣和：声明者自己
+        return seat === st.current; // 摸/打/自摸/过/九种九牌：当前行动者
+      });
+      if (acts.length === 0) continue;
+      m.ws?.send(
+        JSON.stringify({
+          t: 'events',
+          effects: [{ type: 'options', actions: acts, targetSeat: seat }],
+          revision: st.version,
+        }),
+      );
+    }
+  }
+
+  /** 真人自动摸牌（留一点时间给「九种九牌」等操作） */
+  private maybeAutoDraw(seat: number): void {
+    if (!this.state || this.state.awaiting !== 'draw') return;
+    if (this.state.lastDiscard || this.state.pendingKakan) return;
+    clearTimeout(this.drawTimer);
+    this.drawTimer = setTimeout(() => {
+      if (!this.state || this.state.phase !== 'playing') return;
+      if (this.state.awaiting !== 'draw' || this.state.current !== seat) return;
+      if (this.state.lastDiscard || this.state.pendingKakan) return;
+      this.act(seat, { type: 'draw' });
+    }, 450);
   }
 
   // ---------- 私有 ----------
@@ -295,6 +335,8 @@ export class Room {
 
     const effects: GameEffect[] = [
       { type: 'gameStarted', round: this.state.round, seats: this.seatInfos() },
+      { type: 'dora', indicators: this.state.doraIndicators.slice(0, this.state.doraCount) },
+      { type: 'wall', count: this.state.wall.length },
     ];
     for (const p of this.state.players) {
       effects.push({ type: 'hand', player: p.seat, tiles: [...p.hand], targetSeat: p.seat });
@@ -333,7 +375,9 @@ export class Room {
     for (const p of s.players) {
       if (p.seat !== seat) p.hand = p.hand.map(() => -1);
     }
-    s.wall = [];
+    // 牌山打码为占位（保留张数信息，不泄露内容）
+    s.wall = s.wall.map(() => -1);
+    s.rinshanWall = s.rinshanWall.map(() => -1);
     const m = this.members.get(seat);
     m?.ws?.send(JSON.stringify({ t: 'snapshot', state: s }));
   }
@@ -342,7 +386,12 @@ export class Room {
     if (!this.state || this.state.phase !== 'playing') return;
     const seat = this.state.current;
     const m = this.members.get(seat);
-    if (m?.isAI) {
+    if (!m) return;
+    if (!m.isAI) {
+      this.maybeAutoDraw(seat); // 真人：自动摸牌
+      return;
+    }
+    if (m.isAI) {
       clearTimeout(this.aiTimer);
       this.aiTimer = setTimeout(() => {
         if (!this.state || this.state.phase !== 'playing') return;
@@ -394,6 +443,8 @@ export class Room {
       this.roundStart = { round: next.round, dealer: next.dealer };
       const effects: GameEffect[] = [
         { type: 'gameStarted', round: next.round, seats: this.seatInfos() },
+        { type: 'dora', indicators: next.doraIndicators.slice(0, next.doraCount) },
+        { type: 'wall', count: next.wall.length },
       ];
       for (const p of next.players) {
         effects.push({ type: 'hand', player: p.seat, tiles: [...p.hand], targetSeat: p.seat });
@@ -422,5 +473,6 @@ export class Room {
   private stopAI(): void {
     clearTimeout(this.aiTimer);
     clearTimeout(this.ronTimer);
+    clearTimeout(this.drawTimer);
   }
 }
