@@ -820,36 +820,6 @@ onBeforeUnmount(() => {
 
     <!-- 已连接 -->
     <template v-else>
-      <div class="topbar">
-        <span class="round">{{ shown.roundText }} {{ shown.honbaText }}</span>
-        <span class="tools">
-          <label class="opt"><input v-model="soundOn" type="checkbox" />音效</label>
-          <label class="opt"><input v-model="compact" type="checkbox" />精简</label>
-          <button class="mini" @click="net.send({ t: 'replay' })">看录像</button>
-        </span>
-        <span>供托 {{ shown.riichiSticks }} ｜ {{ currentGeneral?.name }}「{{ currentGeneral?.skills[0]?.name }}」</span>
-      </div>
-
-      <!-- 回放控制条 -->
-      <div v-if="replayActive" class="replay-bar">
-        <span class="replay-info">📽 {{ replayInfo }}</span>
-        <span class="replay-steps">第 {{ replayIdx + 1 }} / {{ replayFrames.length }} 步</span>
-        <span class="controls">
-          <button class="mini" @click="setReplayIdx(0)">⏮ 开头</button>
-          <button class="mini" @click="setReplayIdx(replayIdx - 1)">◀ 上一步</button>
-          <button class="mini" @click="replayToggle()">{{ replayPlaying ? '⏸ 暂停' : '▶ 播放' }}</button>
-          <button class="mini" @click="setReplayIdx(replayIdx + 1)">下一步 ▶</button>
-          <button class="mini" @click="setReplayIdx(replayFrames.length - 1)">末尾 ⏭</button>
-          <select v-model.number="replaySpeed">
-            <option :value="0.5">0.5×</option>
-            <option :value="1">1×</option>
-            <option :value="2">2×</option>
-            <option :value="4">4×</option>
-          </select>
-          <button class="mini" @click="stopReplay()">退出回放</button>
-        </span>
-      </div>
-
       <div v-if="!roomStarted" class="lobby">
         <p>入座情况（{{ roomMembers.filter((m) => !m.isAI).length }} 真人 + {{ roomMembers.filter((m) => m.isAI).length }} AI）</p>
         <p class="members">
@@ -865,127 +835,173 @@ onBeforeUnmount(() => {
 
       <!-- 牌桌 -->
       <div v-else class="table">
+        <!-- 左上角：宝牌指示牌 + 场供 -->
+        <div class="corner">
+          <span class="corner-label">宝牌</span>
+          <span class="corner-tiles">
+            <TileSprite v-for="(t, i) in doraIndicators" :key="i" :tile="t" :size="26" />
+          </span>
+          <span class="corner-sep" />
+          <span class="corner-label">场供</span>
+          <span class="corner-val">{{ shown.riichiSticks * 1000 }}</span>
+          <span v-if="shown.honbaText" class="corner-val">{{ shown.honbaText }}</span>
+        </div>
+
+        <!-- 对家：横排，整体居中 -->
         <section class="seat top" :class="{ turn: shown.current === seats.top }">
-          <header>
-            <span class="who"><em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<em class="general">「{{ generalNameOf(seats.top) }}·{{ skillNameOf(seats.top) }}」</em><span v-if="shown.riichi[seats.top]" class="riichi"> 立直</span></span>
-            <span class="score">{{ shown.scores[seats.top] }}</span>
-          </header>
-          <div v-if="!compact" class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
-          </div>
-          <span v-else class="mini-count">手牌 {{ shown.handCounts[seats.top] }}</span>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.top]" :key="i" class="meld-group">
-              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
+              <TileSprite
+                v-for="(t, j) in m.tiles"
+                :key="j"
+                :tile="t"
+                :rotated="isCalled(m, j)"
+                :size="18"
+              />
             </span>
+          </div>
+          <div class="row backs">
+            <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
+          </div>
+          <div class="seat-tag">
+            <em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<span
+              v-if="shown.riichi[seats.top]"
+              class="riichi"
+            >
+              立直</span
+            >
           </div>
         </section>
 
+        <!-- 上家：竖排（牌旋转 90°） -->
         <section class="seat left" :class="{ turn: shown.current === seats.left }">
-          <header>
-            <span class="who"><em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<em class="general">「{{ generalNameOf(seats.left) }}·{{ skillNameOf(seats.left) }}」</em><span v-if="shown.riichi[seats.left]" class="riichi"> 立直</span></span>
-            <span class="score">{{ shown.scores[seats.left] }}</span>
-          </header>
-          <div v-if="!compact" class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.left]" :key="i" back :size="18" />
-          </div>
-          <span v-else class="mini-count">手牌 {{ shown.handCounts[seats.left] }}</span>
-          <div class="row melds">
-            <span v-for="(m, i) in shown.melds[seats.left]" :key="i" class="meld-group">
-              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
+          <div class="v-stack">
+            <span class="v-melds">
+              <TileSprite
+                v-for="(m, i) in shown.melds[seats.left]"
+                :key="i"
+                :tile="m.tiles[0]"
+                :rotated="true"
+                :size="18"
+              />
+            </span>
+            <span class="v-backs">
+              <i v-for="i in shown.handCounts[seats.left]" :key="i" class="back-v" />
+            </span>
+            <span class="seat-tag v-tag">
+              <em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<span
+                v-if="shown.riichi[seats.left]"
+                class="riichi"
+              >
+                立直</span
+              >
             </span>
           </div>
         </section>
 
+        <!-- 中央：方块（点数 + 风位）四周环绕牌河 -->
         <section class="center">
-          <div class="ring">
-            <div class="ring-row">
+          <div class="river-top">
+            <TileSprite
+              v-for="(t, i) in shown.discards[seats.top]"
+              :key="i"
+              :tile="t"
+              :rotated="shown.riichiDiscardIdx[seats.top] === i"
+              :size="18"
+              dim
+            />
+          </div>
+          <div class="river-mid">
+            <div class="river-left">
               <TileSprite
-                v-for="(t, i) in shown.discards[seats.top]"
+                v-for="(t, i) in shown.discards[seats.left]"
                 :key="i"
                 :tile="t"
-                :rotated="shown.riichiDiscardIdx[seats.top] === i"
+                :rotated="shown.riichiDiscardIdx[seats.left] !== i"
                 :size="18"
                 dim
               />
             </div>
-            <div class="ring-mid">
-              <div class="ring-col">
-                <TileSprite
-                  v-for="(t, i) in shown.discards[seats.left]"
-                  :key="i"
-                  :tile="t"
-                  :rotated="shown.riichiDiscardIdx[seats.left] === i"
-                  :size="17"
-                  dim
-                />
-              </div>
-              <div class="field">
-                <span class="big">{{ shown.roundText }}</span>
-                <span class="wind-row">
-                  <span v-for="s in [seats.self, seats.right, seats.top, seats.left]" :key="s" class="wind-chip">
-                    {{ windOf(s) }}<em v-if="isDealer(s)">庄</em>
-                  </span>
-                </span>
-                <span class="dora-row">
-                  <span class="label">宝牌</span>
-                  <TileSprite v-for="(t, i) in doraIndicators" :key="i" :tile="t" :size="22" />
-                </span>
-                <span>剩 {{ wallCount }} 张</span>
-              </div>
-              <div class="ring-col">
-                <TileSprite
-                  v-for="(t, i) in shown.discards[seats.right]"
-                  :key="i"
-                  :tile="t"
-                  :rotated="shown.riichiDiscardIdx[seats.right] === i"
-                  :size="17"
-                  dim
-                />
-              </div>
-            </div>
-            <div class="ring-row">
-              <TileSprite
-                v-for="(t, i) in shown.discards[seats.self]"
-                :key="i"
-                :tile="t"
-                :rotated="shown.riichiDiscardIdx[seats.self] === i"
-                :size="18"
-                dim
-              />
-            </div>
-          </div>
-        </section>
-
-        <section class="seat right" :class="{ turn: shown.current === seats.right }">
-          <header>
-            <span class="who"><em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<em class="general">「{{ generalNameOf(seats.right) }}·{{ skillNameOf(seats.right) }}」</em><span v-if="shown.riichi[seats.right]" class="riichi"> 立直</span></span>
-            <span class="score">{{ shown.scores[seats.right] }}</span>
-          </header>
-          <div v-if="!compact" class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.right]" :key="i" back :size="18" />
-          </div>
-          <span v-else class="mini-count">手牌 {{ shown.handCounts[seats.right] }}</span>
-          <div class="row melds">
-            <span v-for="(m, i) in shown.melds[seats.right]" :key="i" class="meld-group">
-              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
-            </span>
-          </div>
-        </section>
-
-        <section class="seat self" :class="{ turn: shown.current === seats.self }">
-          <header>
-            <span class="who"><em class="wind">{{ windOf(seats.self) }}</em>你 · {{ currentGeneral?.name }}<em class="general">「{{ currentGeneral?.skills[0]?.name }}」</em><span v-if="shown.riichi[seats.self]" class="riichi"> 立直</span></span>
-            <span class="score">
-              <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
-                {{ remainSec }}s{{ inExtraTime ? '（补时）' : '' }}
+            <div class="core">
+              <span class="core-cell">
+                <em class="w">{{ windOf(seats.top) }}</em>{{ shown.scores[seats.top] }}
               </span>
-              {{ shown.scores[seats.self] }}
+              <span class="core-row">
+                <span class="core-cell">
+                  <em class="w">{{ windOf(seats.left) }}</em>{{ shown.scores[seats.left] }}
+                </span>
+                <span class="core-center">
+                  <b>{{ shown.roundText }}</b>
+                  <i>剩 {{ wallCount }}</i>
+                </span>
+                <span class="core-cell">
+                  <em class="w">{{ windOf(seats.right) }}</em>{{ shown.scores[seats.right] }}
+                </span>
+              </span>
+              <span class="core-cell me">
+                <em class="w">{{ windOf(seats.self) }}</em>{{ shown.scores[seats.self] }}
+              </span>
+            </div>
+            <div class="river-right">
+              <TileSprite
+                v-for="(t, i) in shown.discards[seats.right]"
+                :key="i"
+                :tile="t"
+                :rotated="shown.riichiDiscardIdx[seats.right] !== i"
+                :size="18"
+                dim
+              />
+            </div>
+          </div>
+          <div class="river-bottom">
+            <TileSprite
+              v-for="(t, i) in shown.discards[seats.self]"
+              :key="i"
+              :tile="t"
+              :rotated="shown.riichiDiscardIdx[seats.self] === i"
+              :size="18"
+              dim
+            />
+          </div>
+        </section>
+
+        <!-- 下家：竖排 -->
+        <section class="seat right" :class="{ turn: shown.current === seats.right }">
+          <div class="v-stack">
+            <span class="seat-tag v-tag">
+              <em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<span
+                v-if="shown.riichi[seats.right]"
+                class="riichi"
+              >
+                立直</span
+              >
             </span>
-          </header>
+            <span class="v-backs">
+              <i v-for="i in shown.handCounts[seats.right]" :key="i" class="back-v" />
+            </span>
+            <span class="v-melds">
+              <TileSprite
+                v-for="(m, i) in shown.melds[seats.right]"
+                :key="i"
+                :tile="m.tiles[0]"
+                :rotated="true"
+                :size="18"
+              />
+            </span>
+          </div>
+        </section>
+
+        <!-- 自己：副露 + 手牌（居中） + 操作 -->
+        <section class="seat self" :class="{ turn: shown.current === seats.self }">
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
-              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="28" />
+              <TileSprite
+                v-for="(t, j) in m.tiles"
+                :key="j"
+                :tile="t"
+                :rotated="isCalled(m, j)"
+                :size="26"
+              />
             </span>
           </div>
           <div class="row hand">
@@ -1003,6 +1019,9 @@ onBeforeUnmount(() => {
               :size="handTileSize"
               @click="discardTile(shown.lastDrawn)"
             />
+            <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
+              {{ remainSec }}s
+            </span>
           </div>
           <div v-if="!replayActive" class="controls">
             <button
@@ -1019,17 +1038,6 @@ onBeforeUnmount(() => {
 
       <p v-if="ended && !replayActive" class="ended">—— {{ reason }} ——</p>
 
-      <div class="log-wrap">
-        <span class="log-head">
-          日志
-          <button v-if="compact" class="mini" @click="logOpen = !logOpen">
-            {{ logOpen ? '收起 ▴' : '展开 ▾' }}
-          </button>
-        </span>
-        <div class="log" :class="{ folded: compact && !logOpen }">
-          <p v-for="(l, i) in compact && !logOpen ? shown.logs.slice(0, 1) : shown.logs" :key="i">{{ l }}</p>
-        </div>
-      </div>
     </template>
 
     <!-- 结算面板（卷轴） -->

@@ -954,3 +954,277 @@ button.join {
   border-color: #2d4233;
   letter-spacing: 0.3em;
 }
+
+/* ============================================================================
+   局内界面（重做版）：中央方块（点数/风位）四周环绕牌河；左右家竖排；
+   宝牌与场供在左上角；日志与多余信息一律不显示。
+   ========================================================================== */
+
+.table {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(64px, 0.6fr) minmax(260px, 2.6fr) minmax(64px, 0.6fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'top    top    top'
+    'left   center right'
+    'self   self   self';
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background:
+    radial-gradient(140% 100% at 50% 0%, rgba(75, 107, 82, 0.16) 0%, transparent 55%),
+    linear-gradient(180deg, #1d1a14 0%, #141210 100%);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+/* 左上角：宝牌指示牌 + 场供 */
+.corner {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid rgba(201, 162, 39, 0.28);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.42);
+  font-size: 11px;
+}
+
+.corner .corner-label {
+  color: var(--paper-dim);
+  letter-spacing: 0.12em;
+}
+
+.corner .corner-tiles {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.corner .corner-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(233, 226, 211, 0.18);
+}
+
+.corner .corner-val {
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 座位：内容一律居中 */
+.seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px dashed rgba(233, 226, 211, 0.1);
+  border-radius: 3px;
+  padding: 4px;
+}
+
+.seat.top {
+  grid-area: top;
+}
+.seat.left {
+  grid-area: left;
+  border: none;
+}
+.seat.right {
+  grid-area: right;
+  border: none;
+}
+.seat.self {
+  grid-area: self;
+  border-style: solid;
+  border-color: rgba(201, 162, 39, 0.25);
+}
+.seat.turn {
+  border-color: var(--brass);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+}
+
+.seat-tag {
+  font-size: 11px;
+  color: var(--paper-dim);
+  white-space: nowrap;
+}
+
+.seat-tag .wind {
+  font-style: normal;
+  color: var(--brass);
+  margin-right: 3px;
+}
+
+.seat-tag .riichi {
+  color: var(--cinnabar);
+  font-weight: 600;
+}
+
+/* 左右家：竖排（手牌背面细条 + 旋转的副露） */
+.v-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.v-backs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.back-v {
+  display: block;
+  width: 22px;
+  height: 6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #3f5d4a, #223528);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.v-melds {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* 中央：方块在正中，四周为牌河 */
+.center {
+  grid-area: center;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 4px;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 6px;
+}
+
+.river-top,
+.river-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  align-content: flex-start;
+  max-height: 40px;
+  overflow: hidden;
+}
+
+.river-mid {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.river-left,
+.river-right {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-content: center;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* 中央方块：四家点数 + 方位 */
+.core {
+  justify-self: center;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 4px;
+  background: radial-gradient(80% 80% at 50% 20%, rgba(201, 162, 39, 0.09), transparent 72%);
+  font-variant-numeric: tabular-nums;
+}
+
+.core-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.core-cell {
+  font-size: 13px;
+  color: var(--paper);
+}
+
+.core-cell .w {
+  font-style: normal;
+  color: var(--brass);
+  margin-right: 4px;
+}
+
+.core-cell.me {
+  color: var(--brass);
+  font-weight: 600;
+}
+
+.core-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.35;
+  font-size: 10.5px;
+  color: var(--paper-dim);
+}
+
+.core-center b {
+  font-size: 15px;
+  color: var(--brass);
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+.core-center i {
+  font-style: normal;
+}
+
+/* 手牌与操作：居中 */
+.seat.self .row.hand {
+  flex-wrap: nowrap;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.seat.self .controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
+}

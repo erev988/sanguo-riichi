@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  三国麻雀 · 局内界面（按口述重做后的布局）
+  浏览器直接打开本文件即可查看。
+  要点：左上角宝牌/场供；中央方块四周环绕牌河；左右家竖排（旋转 90°）；所有内容居中；无日志。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">
+  <rect width="900" height="620" fill="#0f0d0a"/>
+
+  <!-- 牌桌外框 -->
+  <rect x="20" y="20" width="860" height="580" rx="6" fill="#17150f" stroke="#3a352a"/>
+  <text x="40" y="46" fill="#6b6357" font-size="12">牌桌（局内只有麻将，无日志）</text>
+
+  <!-- 左上角：宝牌 + 场供 -->
+  <rect x="36" y="54" width="220" height="30" rx="4" fill="#0b0a08" stroke="#5f4f24"/>
+  <text x="48" y="74" fill="#a79c86" font-size="12">宝牌</text>
+  <rect x="92" y="60" width="18" height="24" rx="3" fill="#e9e2d3"/>
+  <text x="96" y="77" fill="#8a2a22" font-size="12">1s</text>
+  <rect x="116" y="60" width="18" height="24" rx="3" fill="#e9e2d3"/>
+  <text x="120" y="77" fill="#231815" font-size="12">5p</text>
+  <line x1="146" y1="60" x2="146" y2="84" stroke="#3a352a"/>
+  <text x="156" y="74" fill="#a79c86" font-size="12">场供</text>
+  <text x="196" y="74" fill="#c9a227" font-size="13">1000</text>
+  <text x="240" y="74" fill="#c9a227" font-size="12">2本场</text>
+
+  <!-- ===== 对家（横排，整体居中） ===== -->
+  <rect x="300" y="96" width="300" height="78" rx="4" fill="none" stroke="#3a352a" stroke-dasharray="4 3"/>
+  <text x="418" y="126" fill="#a79c86" font-size="12">副露 [🀇🀇🀇]</text>
+  <g fill="#2c4436" stroke="#3a352a">
+    <rect x="360" y="134" width="14" height="20" rx="2"/><rect x="376" y="134" width="14" height="20" rx="2"/>
+    <rect x="392" y="134" width="14" height="20" rx="2"/><rect x="408" y="134" width="14" height="20" rx="2"/>
+    <rect x="424" y="134" width="14" height="20" rx="2"/><rect x="440" y="134" width="14" height="20" rx="2"/>
+    <rect x="456" y="134" width="14" height="20" rx="2"/><rect x="472" y="134" width="14" height="20" rx="2"/>
+    <rect x="488" y="134" width="14" height="20" rx="2"/><rect x="504" y="134" width="14" height="20" rx="2"/>
+    <rect x="520" y="134" width="14" height="20" rx="2"/>
+  </g>
+  <text x="410" y="168" fill="#e9e2d3" font-size="12">東 对家 · 25000 · 立直</text>
+
+  <!-- ===== 上家（竖排） ===== -->
+  <rect x="36" y="190" width="90" height="300" rx="4" fill="none" stroke="#3a352a"/>
+  <g fill="#2c4436" stroke="#3a352a">
+    <rect x="60" y="212" width="42" height="11" rx="2"/><rect x="60" y="225" width="42" height="11" rx="2"/>
+    <rect x="60" y="238" width="42" height="11" rx="2"/><rect x="60" y="251" width="42" height="11" rx="2"/>
+    <rect x="60" y="264" width="42" height="11" rx="2"/><rect x="60" y="277" width="42" height="11" rx="2"/>
+    <rect x="60" y="290" width="42" height="11" rx="2"/><rect x="60" y="303" width="42" height="11" rx="2"/>
+    <rect x="60" y="316" width="42" height="11" rx="2"/><rect x="60" y="329" width="42" height="11" rx="2"/>
+    <rect x="60" y="342" width="42" height="11" rx="2"/><rect x="60" y="355" width="42" height="11" rx="2"/>
+    <rect x="60" y="368" width="42" height="11" rx="2"/>
+  </g>
+  <text x="42" y="410" fill="#a79c86" font-size="11">副露（旋转）</text>
+  <g fill="#e9e2d3" stroke="#3a352a">
+    <rect x="60" y="420" width="26" height="18" rx="2" transform="rotate(90 73 429)"/>
+    <rect x="60" y="444" width="26" height="18" rx="2" transform="rotate(90 73 453)"/>
+  </g>
+  <text x="44" y="486" fill="#e9e2d3" font-size="12">南 上家</text>
+
+  <!-- ===== 中央：方块 + 四周牌河 ===== -->
+  <rect x="146" y="190" width="608" height="300" rx="4" fill="#0b0a08" stroke="#3a352a"/>
+  <text x="158" y="208" fill="#6b6357" font-size="10">牌河（环绕中央方块）</text>
+
+  <!-- 上方牌河（对家弃牌，横排居中） -->
+  <g fill="#7a7365" stroke="#5a5449">
+    <rect x="300" y="214" width="13" height="19" rx="2"/><rect x="315" y="214" width="13" height="19" rx="2"/>
+    <rect x="330" y="214" width="13" height="19" rx="2"/><rect x="345" y="214" width="13" height="19" rx="2"/>
+    <rect x="360" y="214" width="13" height="19" rx="2"/><rect x="375" y="214" width="13" height="19" rx="2"/>
+    <rect x="300" y="236" width="13" height="19" rx="2"/><rect x="315" y="236" width="13" height="19" rx="2"/>
+    <rect x="330" y="236" width="13" height="19" rx="2"/><rect x="345" y="236" width="13" height="19" rx="2"/>
+  </g>
+
+  <!-- 左侧牌河（上家弃牌，竖排/旋转） -->
+  <g fill="#7a7365" stroke="#5a5449">
+    <rect x="166" y="280" width="19" height="13" rx="2"/><rect x="166" y="295" width="19" height="13" rx="2"/>
+    <rect x="166" y="310" width="19" height="13" rx="2"/><rect x="166" y="325" width="19" height="13" rx="2"/>
+    <rect x="188" y="280" width="19" height="13" rx="2"/><rect x="188" y="295" width="19" height="13" rx="2"/>
+    <rect x="188" y="310" width="19" height="13" rx="2"/><rect x="188" y="325" width="19" height="13" rx="2"/>
+  </g>
+
+  <!-- 右侧牌河（下家弃牌，竖排/旋转） -->
+  <g fill="#7a7365" stroke="#5a5449">
+    <rect x="680" y="280" width="19" height="13" rx="2"/><rect x="680" y="295" width="19" height="13" rx="2"/>
+    <rect x="680" y="310" width="19" height="13" rx="2"/><rect x="680" y="325" width="19" height="13" rx="2"/>
+    <rect x="702" y="280" width="19" height="13" rx="2"/><rect x="702" y="295" width="19" height="13" rx="2"/>
+    <rect x="702" y="310" width="19" height="13" rx="2"/><rect x="702" y="325" width="19" height="13" rx="2"/>
+  </g>
+
+  <!-- 下方牌河（自己弃牌，横排居中） -->
+  <g fill="#7a7365" stroke="#5a5449">
+    <rect x="300" y="432" width="13" height="19" rx="2"/><rect x="315" y="432" width="13" height="19" rx="2"/>
+    <rect x="330" y="432" width="13" height="19" rx="2"/><rect x="345" y="432" width="13" height="19" rx="2"/>
+    <rect x="360" y="432" width="13" height="19" rx="2"/><rect x="375" y="432" width="13" height="19" rx="2"/>
+    <rect x="300" y="454" width="13" height="19" rx="2"/><rect x="315" y="454" width="13" height="19" rx="2"/>
+  </g>
+
+  <!-- 中央方块：各家点数 + 方位 -->
+  <rect x="330" y="268" width="240" height="140" rx="6" fill="#141210" stroke="#c9a227"/>
+  <text x="352" y="296" fill="#e9e2d3" font-size="13">東 <tspan fill="#c9a227">25000</tspan><tspan fill="#a79c86" dx="6">（对家）</tspan></text>
+  <text x="352" y="330" fill="#e9e2d3" font-size="13">南 <tspan fill="#c9a227">24000</tspan><tspan fill="#a79c86" dx="6">（上家）</tspan></text>
+  <text x="352" y="364" fill="#e9e2d3" font-size="13">西 <tspan fill="#c9a227">26000</tspan><tspan fill="#a79c86" dx="6">（下家）</tspan></text>
+  <text x="352" y="396" fill="#c9a227" font-size="13">北 25000（你）</text>
+  <text x="452" y="296" fill="#6b6357" font-size="10">← 风向按方位</text>
+  <text x="452" y="330" fill="#6b6357" font-size="10">东＝庄家</text>
+  <text x="452" y="396" fill="#6b6357" font-size="10">剩 63 张</text>
+
+  <!-- ===== 下家（竖排） ===== -->
+  <rect x="774" y="190" width="90" height="300" rx="4" fill="none" stroke="#3a352a"/>
+  <text x="782" y="216" fill="#e9e2d3" font-size="12">西 下家</text>
+  <g fill="#2c4436" stroke="#3a352a">
+    <rect x="798" y="228" width="42" height="11" rx="2"/><rect x="798" y="241" width="42" height="11" rx="2"/>
+    <rect x="798" y="254" width="42" height="11" rx="2"/><rect x="798" y="267" width="42" height="11" rx="2"/>
+    <rect x="798" y="280" width="42" height="11" rx="2"/><rect x="798" y="293" width="42" height="11" rx="2"/>
+    <rect x="798" y="306" width="42" height="11" rx="2"/><rect x="798" y="319" width="42" height="11" rx="2"/>
+    <rect x="798" y="332" width="42" height="11" rx="2"/><rect x="798" y="345" width="42" height="11" rx="2"/>
+    <rect x="798" y="358" width="42" height="11" rx="2"/><rect x="798" y="371" width="42" height="11" rx="2"/>
+    <rect x="798" y="384" width="42" height="11" rx="2"/>
+  </g>
+  <g fill="#e9e2d3" stroke="#3a352a">
+    <rect x="806" y="420" width="26" height="18" rx="2" transform="rotate(90 819 429)"/>
+  </g>
+  <text x="800" y="462" fill="#a79c86" font-size="11">副露（旋转）</text>
+
+  <!-- ===== 自己：手牌居中 + 操作 ===== -->
+  <rect x="146" y="500" width="608" height="88" rx="4" fill="none" stroke="#c9a227"/>
+  <text x="280" y="522" fill="#a79c86" font-size="11">副露 [🀙🀙🀙]</text>
+  <g fill="#e9e2d3" stroke="#8a7f68">
+    <rect x="196" y="532" width="30" height="42" rx="4"/><rect x="230" y="532" width="30" height="42" rx="4"/>
+    <rect x="264" y="532" width="30" height="42" rx="4"/><rect x="298" y="532" width="30" height="42" rx="4"/>
+    <rect x="332" y="532" width="30" height="42" rx="4"/><rect x="366" y="532" width="30" height="42" rx="4"/>
+    <rect x="400" y="532" width="30" height="42" rx="4"/><rect x="434" y="532" width="30" height="42" rx="4"/>
+    <rect x="468" y="532" width="30" height="42" rx="4"/><rect x="502" y="532" width="30" height="42" rx="4"/>
+    <rect x="536" y="532" width="30" height="42" rx="4"/><rect x="570" y="532" width="30" height="42" rx="4"/>
+    <rect x="604" y="532" width="30" height="42" rx="4"/>
+  </g>
+  <rect x="646" y="532" width="30" height="42" rx="4" fill="#f6f0e2" stroke="#8a7f68"/>
+  <text x="652" y="560" fill="#231815" font-size="11">摸</text>
+  <text x="700" y="560" fill="#c9a227" font-size="12">⏱ 32s</text>
+  <text x="300" y="600" fill="#a79c86" font-size="12">[自摸] [荣和 1s] [过]　← 按钮自动出现，居中</text>
+</svg>
