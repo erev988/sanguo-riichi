@@ -188,6 +188,21 @@ createGame(seats, { rules: { kiriageMangan: true, initialScore: 50000 } }); // �
 > 注：本仓库在沙箱环境开发时，给系统 cacache 打过补丁（`fs.link` → `copyFile`，
 > 见 `/usr/share/nodejs/cacache/lib/util/move-file.js`），仅影响沙箱内 npm 安装，与项目代码无关。
 
+
+### 技能能力（声明式，引擎统一处理）
+
+| 能力 | 作用 | 启用者 |
+|---|---|---|
+| `blocksCalls` | 你打出的牌不可被吃/碰/杠 | 夏侯惇 · 刚烈 |
+| `locksRiichi` | 先制立直后封锁他人立直 | 袁术 · 妄尊 |
+| `suppressesRyukyoku` | 听牌时接管流局罚符结算 | 董卓 · 暴敛 |
+| `forceWin` | 无役亦可和牌（0 番照和，宝牌番数照算） | 袁绍 · 乱击 |
+| `countsAsYaku` | 技能给出的番数可充当「和牌资格」（无役时靠它成立） | **暂未启用**，需要时在武将数据里标注 |
+
+**技能钩子**：`onAgaru`（自己和牌改番/加钱）、`onOtherAgaru`（他人和牌收费）、`onRyukyoku`（流局）、`onCall`（他人副露收费）、`onPay`（付点时减额）。
+
+> 规则边界：**「役」= 和牌资格，「番」= 役的价值**。宝牌/赤宝牌/里宝牌计入番数但不构成役；
+> 技能默认只能改番，若要突破「必须有役」需显式声明 `forceWin` 或 `countsAsYaku`。
 ## 部署
 
 ### 本地运行

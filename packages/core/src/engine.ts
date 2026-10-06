@@ -297,12 +297,16 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const winner = s.current;
       const hand = s.players[winner].hand;
       const agariPai = hand[hand.length - 1]; // 摸牌在末尾
-      const allowNoYaku = (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin);
+      const winnerSkills = opts.skillsOf(winner) ?? [];
+      const hasForceWin = winnerSkills.some((sk) => sk.forceWin);
+      const mayCountSkillHan = winnerSkills.some((sk) => sk.countsAsYaku);
       const win = opts.calcWin
         ? opts.calcWin(s, winner, 'tsumo', agariPai)
-        : winFromState(s, winner, 'tsumo', agariPai, false, allowNoYaku);
+        : winFromState(s, winner, 'tsumo', agariPai, false, hasForceWin || mayCountSkillHan);
       if (!win) return fail('无役，不能自摸');
       const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win);
+      // countsAsYaku：无役时靠技能番数成立；若技能最终没给出番数则不能和
+      if (!hasRealYaku(win) && !hasForceWin && win.han < 1) return fail('无役且无番，不能自摸');
       const otherPayments: Payment[] = [];
       applyOtherAgaruSkills(s, opts, winner, otherPayments); // 他人和牌钩子（妄尊）
       const payments = [
@@ -333,12 +337,16 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const fromKakan =
         s.pendingKakan && s.pendingKakan.player === action.from && s.pendingKakan.tile === action.tile;
       if (!fromDiscard && !fromKakan) return fail('没有可荣和的牌');
-      const allowNoYakuR = (opts.skillsOf(winner) ?? []).some((sk) => sk.forceWin);
+      const winnerSkillsR = opts.skillsOf(winner) ?? [];
+      const hasForceWinR = winnerSkillsR.some((sk) => sk.forceWin);
+      const mayCountSkillHanR = winnerSkillsR.some((sk) => sk.countsAsYaku);
       const win2 = opts.calcWin
         ? opts.calcWin(s, winner, 'ron', action.tile)
-        : winFromState(s, winner, 'ron', action.tile, !!fromKakan, allowNoYakuR);
+        : winFromState(s, winner, 'ron', action.tile, !!fromKakan, hasForceWinR || mayCountSkillHanR);
       if (!win2) return fail('无役，不能荣和');
       const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win2);
+      // countsAsYaku：无役时靠技能番数成立；若技能最终没给出番数则不能和
+      if (!hasRealYaku(win2) && !hasForceWinR && win2.han < 1) return fail('无役且无番，不能荣和');
       const otherPayments: Payment[] = [];
       applyOtherAgaruSkills(s, opts, winner, otherPayments); // 他人和牌钩子（妄尊）
       const first = s.agariThisTurn.length === 0; // 頭跳ね：仅第一家和牌者得立直棒/本场
@@ -595,6 +603,12 @@ function applyAgaruSkills(
   //（役种依然存在，只是番数为 0；和牌者照常收走场上全部立直棒）
   if (win.han < 0) win.han = 0;
   return { payments, skillLog };
+}
+
+/** 和牌是否含真实役（宝牌/里宝牌/赤宝牌 不算役） */
+function hasRealYaku(win: WinInfo): boolean {
+  const notYaku = new Set(['宝牌', '里宝牌', '赤宝牌']);
+  return win.yaku.some((y) => !notYaku.has(y));
 }
 
 /** 某座位是否拥有满足条件的技能 */
