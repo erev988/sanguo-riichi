@@ -53,6 +53,8 @@ export const ClientMsgSchema = z.discriminatedUnion('t', [
       rules: RulesSchema,
       /** 会话标识（重连凭此恢复原座位） */
       token: z.string().max(64).optional(),
+      /** 房间密码（房主设置；加入时需匹配） */
+      password: z.string().max(32).optional(),
     }),
   }),
   z.object({ t: z.literal('act'), action: ActionSchema, seq: z.number().int().nonnegative() }),
@@ -83,6 +85,8 @@ export interface RoomInfo {
   humans: number;
   ais: number;
   started: boolean;
+  /** 是否设置了密码 */
+  locked: boolean;
 }
 
 export type ServerMsg =

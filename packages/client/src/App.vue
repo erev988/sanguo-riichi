@@ -22,7 +22,10 @@ const connected = ref(false);
 const status = ref('未连接');
 const name = ref('玩家');
 const roomId = ref('room1');
+const password = ref('');
 const generalId = ref('gen-guanyu');
+/** 已成功入座的房间（断线后自动复座；仅入座成功才记录） */
+let joinedRoom = '';
 const kiriageMangan = ref(false);
 const soundOn = ref(true);
 const token = ref(
@@ -419,6 +422,7 @@ function handleMsg(msg: ServerMsg): void {
   switch (msg.t) {
     case 'welcome':
       mySeat.value = msg.seat;
+      joinedRoom = msg.roomId; // 记录成功入座的房间，供断线复座
       status.value = msg.started ? '对局中' : '等待入座…';
       pushLog(msg.rejoined ? `✅ 断线重连，恢复座位 ${msg.seat + 1}` : `入座 ${msg.seat + 1} 位`);
       net.send({ t: 'snapshot', seq: ++net.seq });
@@ -457,6 +461,13 @@ function handleMsg(msg: ServerMsg): void {
       break;
     }
     case 'error':
+      if (msg.code === 'wrong-password') {
+        joinedRoom = '';
+        status.value = '房间密码错误，请重新入座';
+      } else if (msg.code === 'join-failed') {
+        joinedRoom = '';
+        status.value = '入座失败（房间可能已开局或已满）';
+      }
       pushLog(`错误：${msg.code}`);
       break;
     case 'pong':
@@ -540,21 +551,18 @@ watch([replayPlaying, replaySpeed], () => {
   }, interval);
 });
 
-function connect(): void {
+/** 连接（只建立 WS，不入座） */
+function connectOnly(): void {
   void enterFullscreenLandscape(); // 移动端：自动进入全屏并锁横屏
   net.onOpen = () => {
     connected.value = true;
-    status.value = '入座中…';
-    net.send({
-      t: 'join',
-      payload: {
-        name: name.value,
-        roomId: roomId.value,
-        generalId: generalId.value,
-        rules: { kiriageMangan: kiriageMangan.value },
-        token: token.value,
-      },
-    });
+    if (joinedRoom) {
+      status.value = '重连中，恢复座位…';
+      sendJoin(joinedRoom); // 断线后自动复座（token 免密码）
+    } else {
+      status.value = '已连接';
+      net.send({ t: 'rooms' }); // 连上后顺手拉一次房间列表
+    }
   };
   net.onClose = () => {
     connected.value = false;
@@ -564,12 +572,50 @@ function connect(): void {
     status.value = `连接断开，${Math.round(delayMs / 1000)}s 后重连（第 ${attempt} 次）…`;
   };
   net.onMsg = handleMsg;
-  // 生产环境可用 VITE_WS_URL 指定（如 wss://your.domain/ws）；开发默认连本机 8787
   const wsUrl =
     (import.meta.env.VITE_WS_URL as string | undefined) ??
     `ws://${location.hostname || 'localhost'}:8787`;
   net.connect(wsUrl);
   status.value = '连接中…';
+}
+
+function sendJoin(room: string): void {
+  net.send({
+    t: 'join',
+    payload: {
+      name: name.value,
+      roomId: room,
+      generalId: generalId.value,
+      rules: { kiriageMangan: kiriageMangan.value },
+      token: token.value,
+      password: password.value,
+    },
+  });
+}
+
+/** 入座（连接 + 房间号 + 密码都齐了才发） */
+function joinRoom(): void {
+  if (!connected.value) {
+    status.value = '请先点「连接」';
+    return;
+  }
+  const room = roomId.value.trim();
+  if (!room) {
+    status.value = '请填写房间号';
+    return;
+  }
+  status.value = '入座中…';
+  sendJoin(room);
+}
+
+/** 刷新房间列表（需要已连接） */
+function refreshRooms(): void {
+  if (!connected.value) {
+    status.value = '请先点「连接」';
+    return;
+  }
+  net.send({ t: 'rooms' });
+  status.value = '已刷新房间列表';
 }
 
 function act(action: Action): void {
@@ -674,23 +720,31 @@ onBeforeUnmount(() => {
       <div class="panel">
         <input v-model="name" placeholder="昵称" />
         <input v-model="roomId" placeholder="房间号" />
+        <input v-model="password" type="password" placeholder="房间密码（可空）" />
         <select v-model="generalId">
           <option v-for="g in ALL_GENERALS" :key="g.id" :value="g.id">{{ g.name }}（{{ g.desc }}）</option>
         </select>
         <label class="opt"><input v-model="kiriageMangan" type="checkbox" />切上满贯</label>
-        <button @click="connect">入座</button>
       </div>
+      <div class="panel">
+        <button @click="connectOnly" :disabled="connected">
+          {{ connected ? '已连接' : '连接' }}
+        </button>
+        <button @click="refreshRooms" :disabled="!connected">刷新列表</button>
+        <button class="join" @click="joinRoom" :disabled="!connected">入座</button>
+        <span class="status">{{ status }}</span>
+      </div>
+
       <div class="lobby">
-        <p>
-          房间一览
-          <button class="mini" @click="connect(); net.send({ t: 'rooms' })">连接并刷新</button>
-        </p>
-        <p v-if="rooms.length === 0" class="hint">（暂无房间，连接后可刷新）</p>
+        <p>房间一览</p>
+        <p v-if="rooms.length === 0" class="hint">（暂无房间，连上后点「刷新列表」）</p>
         <p class="members">
           <span v-for="r in rooms" :key="r.id" class="room-item" @click="roomId = r.id">
-            {{ r.id }} · {{ r.humans }} 人 + {{ r.ais }} AI · {{ r.started ? '进行中' : '待开局' }}
+            {{ r.locked ? '🔒 ' : '' }}{{ r.id }} · {{ r.humans }} 人 + {{ r.ais }} AI ·
+            {{ r.started ? '进行中' : '待开局' }}
           </span>
         </p>
+        <p class="hint">点击房间名可填入房间号；🔒 表示需要密码（房主建房时设置的密码即为该房密码）</p>
       </div>
     </template>
 

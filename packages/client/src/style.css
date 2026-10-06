@@ -649,7 +649,14 @@ button.ron:hover {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  margin: 12px 0;
+  margin: 10px 0;
+}
+
+button.join {
+  background: linear-gradient(180deg, #4b6b52 0%, #3a5541 100%);
+  border-color: #2d4233;
+  font-weight: 600;
+  letter-spacing: 0.16em;
 }
 
 .panel label.opt {

@@ -22,24 +22,29 @@ wss.on('connection', (ws: WebSocket) => {
       const msg = parsed.data;
 
       if (msg.t === 'join') {
-        const { roomId, name, generalId, rules, token } = msg.payload;
+        const { roomId, name, generalId, rules, token, password } = msg.payload;
         let room = rooms.get(roomId);
         if (!room) {
           room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
           rooms.set(roomId, room);
         }
-        const { seat, started, rejoined } = room.join(ws, name, generalId, rules, token);
-        ws.send(
-          JSON.stringify({
-            t: 'welcome',
-            roomId,
-            seat,
-            started,
-            protocolVersion: PROTOCOL_VERSION,
-            rules: room.rules, // 房间规则（房主指定，含切上满贯等）
-            rejoined,
-          }),
-        );
+        try {
+          const { seat, started, rejoined } = room.join(ws, name, generalId, rules, token, password);
+          ws.send(
+            JSON.stringify({
+              t: 'welcome',
+              roomId,
+              seat,
+              started,
+              protocolVersion: PROTOCOL_VERSION,
+              rules: room.rules, // 房间规则（房主指定，含切上满贯等）
+              rejoined,
+            }),
+          );
+        } catch (e) {
+          const code = (e as Error).message === 'wrong-password' ? 'wrong-password' : 'join-failed';
+          ws.send(JSON.stringify({ t: 'error', code }));
+        }
       } else if (msg.t === 'rooms') {
         ws.send(JSON.stringify({ t: 'rooms', rooms: [...rooms.values()].map((r) => r.info()) }));
       } else if (msg.t === 'ping') {

@@ -46,6 +46,8 @@ export class Room {
   hostSeat = -1;
   /** 会话标识 → 座位（断线重连凭此恢复原座位） */
   private tokens = new Map<string, number>();
+  /** 房间密码（房主设置；空串表示无密码） */
+  private password = '';
   // ---- 录像：记录动作序列即可完整重放（引擎为纯函数） ----
   private meta?: { seats: SeatConfig[]; rules: Rules; seed: number };
   private rounds: ReplayRound[] = [];
@@ -79,8 +81,9 @@ export class Room {
     generalId: string,
     rules?: Partial<Rules>,
     token?: string,
+    password?: string,
   ): { seat: number; started: boolean; rejoined: boolean } {
-    // 断线重连：token 命中 → 恢复原座位
+    // 断线重连：token 命中 → 恢复原座位（免密码）
     if (token) {
       const seat = this.tokens.get(token);
       if (seat != null) {
@@ -103,10 +106,14 @@ export class Room {
       }
     }
 
-    if (this.started) throw new Error('游戏已开始');
+    if (this.started) throw new Error('started');
+    if (this.hostSeat >= 0 && this.password && password !== this.password) {
+      throw new Error('wrong-password'); // 房间密码不匹配
+    }
     if (this.hostSeat < 0) {
       this.hostSeat = this.firstFreeSeat();
       this.rules = resolveRules(rules); // 房主规则
+      this.password = password ?? ''; // 房主设置密码
     }
     const general = generalById(generalId) ?? ALL_GENERALS[0];
     const seat = this.firstFreeSeat();
@@ -121,13 +128,14 @@ export class Room {
   }
 
   /** 房间摘要（供房间列表） */
-  info(): { id: string; humans: number; ais: number; started: boolean } {
+  info(): { id: string; humans: number; ais: number; started: boolean; locked: boolean } {
     const members = [...this.members.values()];
     return {
       id: this.id,
       humans: members.filter((m) => !m.isAI).length,
       ais: members.filter((m) => m.isAI).length,
       started: this.started,
+      locked: this.password.length > 0,
     };
   }
 
