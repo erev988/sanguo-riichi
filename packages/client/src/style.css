@@ -59,17 +59,29 @@ body {
 .app {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 14px 16px 32px;
+  padding: 8px 12px;
+  /* 固定为视口高度（含移动端动态视口），内部各区域按固定比例分配 */
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
-.app .log {
-  flex: 1 1 auto;
-  min-height: 0;
+.app > .topbar,
+.app > .replay-bar,
+.app > .ended {
+  flex: 0 0 auto;
+}
+
+/* 日志：固定高度、内部滚动，绝不参与撑高布局 */
+.app > .log {
+  flex: 0 0 auto;
+  height: 88px;
+  max-height: 88px;
+  overflow-y: auto;
+  margin: 0;
 }
 
 h1 {
@@ -204,29 +216,52 @@ button.ron:hover {
 /* ---------- 牌桌 ---------- */
 .table {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(240px, 1.6fr) minmax(120px, 1fr);
-  grid-template-rows: auto minmax(150px, auto) auto;
-  /* 自己一栏横跨整行 → 手牌能一整条排开 */
+  grid-template-columns: minmax(110px, 1fr) minmax(220px, 1.6fr) minmax(110px, 1fr);
+  /* 三行按固定比例分配剩余高度：内容再多也不会撑高整体 */
+  grid-template-rows: minmax(0, 0.85fr) minmax(0, 1.3fr) minmax(0, 1.15fr);
   grid-template-areas:
     'top    top    top'
     'left   center right'
     'self   self   self';
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background:
     radial-gradient(140% 100% at 50% 0%, rgba(75, 107, 82, 0.16) 0%, transparent 55%),
     linear-gradient(180deg, #1d1a14 0%, #141210 100%);
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .seat {
   border: 1px dashed rgba(233, 226, 211, 0.12);
   border-radius: 3px;
-  padding: 6px 8px;
-  min-height: 60px;
+  padding: 4px 6px;
+  min-height: 0;
+  overflow: hidden; /* 内容超出即裁剪，不撑大布局 */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.seat > header {
+  flex: 0 0 auto;
+}
+
+/* 手牌背面 / 副露 / 弃牌：各自限额，超出裁剪 */
+.seat .row.backs {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-height: 34px;
+}
+
+.seat .row.melds {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-height: 38px;
 }
 
 .seat.top {
@@ -299,17 +334,7 @@ button.ron:hover {
   display: none;
 }
 
-/* ---------- 中央：弃牌环 + 场况 ---------- */
-.center {
-  grid-area: center;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.22);
-  padding: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/*（旧的 center 定义已移除，见文件后部的固定版）*/
 
 .ring {
   display: flex;
@@ -353,7 +378,8 @@ button.ron:hover {
   gap: 2px;
   font-size: 12px;
   color: var(--paper-dim);
-  background: radial-gradient(80% 80% at 50% 20%, rgba(201, 162, 39, 0.07), transparent 70%);
+  background: radial-gradient(80% 80% at 50% 20%, rgba(201, 162, 39, 0.07), transparent 70%);  overflow: hidden;
+
 }
 
 .field .big {
@@ -456,7 +482,8 @@ button.ron:hover {
     margin-bottom: 2px;
   }
   .log {
-    max-height: 84px;
+    height: 72px;
+    max-height: 72px;
     font-size: 11.5px;
     line-height: 1.5;
   }
@@ -493,17 +520,81 @@ button.ron:hover {
   filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.5));
 }
 
-/* 刚摸的牌：与手牌分开并侧移 */
-.row.hand .tile.just-drawn {
-  margin-left: 14px;
+/* 自己的手牌：优先展示，固定高度不参与挤压 */
+.seat.self .row.hand {
+  flex: 0 0 auto;
+  overflow: hidden;
 }
 
+.seat.self .controls {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+/* 刚摸的牌：与手牌分开并侧移 */
 .controls {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
   justify-content: center;
+}
+
+.row.hand .tile.just-drawn {
+  margin-left: 12px;
+}
+
+/* ---------- 中央：弃牌环 + 场况（固定在所属格内） ---------- */
+.center {
+  grid-area: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 6px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ring {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.ring-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  align-content: flex-start;
+  max-height: 42%;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.ring-mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.ring-col {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 2px;
+  flex: 0 1 auto;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 /* ---------- 大厅 ---------- */

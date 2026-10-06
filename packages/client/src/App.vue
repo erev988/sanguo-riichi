@@ -70,8 +70,9 @@ const dealer = ref(0);
 const timerEnd = ref(0);
 const timerTotal = ref(35000);
 const nowTick = ref(Date.now());
-/** 视口宽度（手牌自适应缩放，保证一整条不换行） */
+/** 视口尺寸（手牌自适应缩放，保证一整条且不撑破布局） */
 const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
+const vh = ref(typeof window !== 'undefined' ? window.innerHeight : 800);
 
 /** 剩余秒数（无计时为 null） */
 const remainSec = computed(() => {
@@ -160,10 +161,12 @@ const handCore = computed(() => {
   return [...body].sort((a, b) => norm(a) - norm(b));
 });
 
-/** 手牌牌高：随视口与张数自适应，保证 13/14 张始终一整条（并与副露分开） */
+/** 手牌牌高：同时受视口宽/高约束，保证 13/14 张一整条且不撑破牌桌 */
 const handTileSize = computed(() => {
   const n = (handCore.value.length ?? 13) + 1;
-  return Math.max(26, Math.min(48, Math.floor((vw.value - 56) / Math.max(13, n))));
+  const byWidth = Math.floor((vw.value - 56) / Math.max(13, n));
+  const byHeight = Math.floor(vh.value * 0.125);
+  return Math.max(22, Math.min(48, byWidth, byHeight));
 });
 
 /** 风位：庄家为东，逆时针（座位号 +1）依次 南西北 */
@@ -630,6 +633,7 @@ async function enterFullscreenLandscape(): Promise<void> {
 
 function onResize(): void {
   vw.value = window.innerWidth;
+  vh.value = window.innerHeight;
 }
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 if (typeof window !== 'undefined') {
@@ -728,11 +732,11 @@ onBeforeUnmount(() => {
             <span class="score">{{ shown.scores[seats.top] }}</span>
           </header>
           <div class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="26" />
+            <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
           </div>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.top]" :key="i" class="meld-group">
-              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="24" />
+              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
             </span>
           </div>
         </section>
@@ -743,7 +747,7 @@ onBeforeUnmount(() => {
             <span class="score">{{ shown.scores[seats.left] }}</span>
           </header>
           <div class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.left]" :key="i" back :size="20" />
+            <TileSprite v-for="i in shown.handCounts[seats.left]" :key="i" back :size="18" />
           </div>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.left]" :key="i" class="meld-group">
@@ -760,7 +764,7 @@ onBeforeUnmount(() => {
                 :key="i"
                 :tile="t"
                 :rotated="shown.riichiDiscardIdx[seats.top] === i"
-                :size="22"
+                :size="18"
                 dim
               />
             </div>
@@ -771,7 +775,7 @@ onBeforeUnmount(() => {
                   :key="i"
                   :tile="t"
                   :rotated="shown.riichiDiscardIdx[seats.left] === i"
-                  :size="20"
+                  :size="17"
                   dim
                 />
               </div>
@@ -794,7 +798,7 @@ onBeforeUnmount(() => {
                   :key="i"
                   :tile="t"
                   :rotated="shown.riichiDiscardIdx[seats.right] === i"
-                  :size="20"
+                  :size="17"
                   dim
                 />
               </div>
@@ -805,7 +809,7 @@ onBeforeUnmount(() => {
                 :key="i"
                 :tile="t"
                 :rotated="shown.riichiDiscardIdx[seats.self] === i"
-                :size="22"
+                :size="18"
                 dim
               />
             </div>
@@ -818,7 +822,7 @@ onBeforeUnmount(() => {
             <span class="score">{{ shown.scores[seats.right] }}</span>
           </header>
           <div class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.right]" :key="i" back :size="20" />
+            <TileSprite v-for="i in shown.handCounts[seats.right]" :key="i" back :size="18" />
           </div>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.right]" :key="i" class="meld-group">
@@ -839,7 +843,7 @@ onBeforeUnmount(() => {
           </header>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
-              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="34" />
+              <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="28" />
             </span>
           </div>
           <div class="row hand">
