@@ -83,6 +83,8 @@ export const ClientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('start') }),
   /** 房主：添加一个 AI 占位 */
   z.object({ t: z.literal('addAI') }),
+  /** 未开局时更换武将（入座后在大厅选将） */
+  z.object({ t: z.literal('pickGeneral'), generalId: z.string().max(32) }),
   /** 查询房间列表 */
   z.object({ t: z.literal('rooms') }),
   /** 获取本房最近一局回放 */

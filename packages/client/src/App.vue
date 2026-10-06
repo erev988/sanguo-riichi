@@ -141,7 +141,22 @@ const replaySpeed = ref(2);
 const replayInfo = ref('');
 let replayTimer: ReturnType<typeof setInterval> | null = null;
 
-const currentGeneral = computed(() => ALL_GENERALS.find((g) => g.id === generalId.value));
+/** 我的实际武将（以房间成员为准，入座后可在选将区切换） */
+const myGeneralId = computed(
+  () => roomMembers.value.find((m) => m.seat === mySeat.value)?.generalId ?? generalId.value,
+);
+const currentGeneral = computed(() => ALL_GENERALS.find((g) => g.id === myGeneralId.value));
+
+/** 查看某座位武将详情（点击座位名触发） */
+const inspectSeat = ref<number | null>(null);
+function generalOf(seat: number) {
+  const gid = roomMembers.value.find((m) => m.seat === seat)?.generalId;
+  return ALL_GENERALS.find((g) => g.id === gid);
+}
+/** 未开局时切换自己的武将 */
+function pickGeneral(id: string): void {
+  net.send({ t: 'pickGeneral', generalId: id });
+}
 const seats = computed(() => {
   const s = mySeat.value ?? 0;
   return { self: s, right: (s + 1) % 4, top: (s + 2) % 4, left: (s + 3) % 4 };
@@ -229,6 +244,11 @@ function skillNameOf(seat: number): string {
 function pushLog(msg: string): void {
   logs.value.unshift(msg);
   if (logs.value.length > 200) logs.value.pop();
+}
+
+const FACTION: Record<string, string> = { wei: '魏', shu: '蜀', wu: '吴', qun: '群' };
+function factionName(f?: string): string {
+  return f ? (FACTION[f] ?? f) : '';
 }
 
 const WIND: Record<string, string> = { east: '东', south: '南', west: '西', north: '北' };
@@ -822,9 +842,6 @@ onBeforeUnmount(() => {
     <template v-if="!connected">
       <div class="panel">
         <input v-model="name" placeholder="昵称" />
-        <select v-model="generalId">
-          <option v-for="g in ALL_GENERALS" :key="g.id" :value="g.id">{{ g.name }}（{{ g.desc }}）</option>
-        </select>
         <label class="opt"><input v-model="kiriageMangan" type="checkbox" />切上满贯（建房规则）</label>
         <button class="join" @click="connectOnly">连接</button>
         <span class="status">{{ status }}</span>
@@ -877,6 +894,23 @@ onBeforeUnmount(() => {
             {{ m.seat + 1 }}位 {{ m.name }}{{ m.isAI ? '（AI）' : '' }} · {{ generalNameOf(m.seat) }}「{{ skillNameOf(m.seat) }}」
           </span>
         </p>
+        <div class="general-pick">
+          <p>选择你的武将（点击切换，开局后锁定）</p>
+          <div class="general-grid">
+            <button
+              v-for="g in ALL_GENERALS"
+              :key="g.id"
+              class="general-card"
+              :class="{ active: myGeneralId === g.id }"
+              @click="pickGeneral(g.id)"
+            >
+              <b>{{ g.name }}</b>
+              <i>「{{ g.skills[0]?.name }}」</i>
+              <small>{{ g.desc }}</small>
+            </button>
+          </div>
+        </div>
+
         <div v-if="isHost" class="controls">
           <button @click="net.send({ t: 'addAI' })">补入 AI</button>
           <button @click="net.send({ t: 'start' })">开局（空位以 AI 补足）</button>
@@ -913,7 +947,7 @@ onBeforeUnmount(() => {
           <div class="row backs">
             <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
           </div>
-          <div class="seat-tag">
+          <div class="seat-tag" @click="inspectSeat = seats.top">
             <em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<em class="gen">{{ generalNameOf(seats.top) }}</em><span
               v-if="shown.riichi[seats.top]"
               class="riichi"
@@ -938,7 +972,7 @@ onBeforeUnmount(() => {
             <span class="v-backs">
               <i v-for="i in shown.handCounts[seats.left]" :key="i" class="back-v" />
             </span>
-            <span class="seat-tag v-tag">
+            <span class="seat-tag v-tag" @click="inspectSeat = seats.left">
               <em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<em class="gen">{{ generalNameOf(seats.left) }}</em><span
                 v-if="shown.riichi[seats.left]"
                 class="riichi"
@@ -1018,7 +1052,7 @@ onBeforeUnmount(() => {
         <!-- 下家：竖排 -->
         <section class="seat right" :class="{ turn: shown.current === seats.right }">
           <div class="v-stack">
-            <span class="seat-tag v-tag">
+            <span class="seat-tag v-tag" @click="inspectSeat = seats.right">
               <em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<em class="gen">{{ generalNameOf(seats.right) }}</em><span
                 v-if="shown.riichi[seats.right]"
                 class="riichi"
@@ -1099,6 +1133,20 @@ onBeforeUnmount(() => {
       <p v-if="ended && !replayActive" class="ended">—— {{ reason }} ——</p>
 
     </template>
+
+    <!-- 武将详情（点击座位名查看） -->
+    <div v-if="inspectSeat !== null" class="modal-mask" @click.self="inspectSeat = null">
+      <div class="info-card">
+        <div class="info-title">
+          {{ memberName(inspectSeat) }} · {{ generalOf(inspectSeat)?.name }}
+        </div>
+        <div v-for="(sk, i) in generalOf(inspectSeat)?.skills ?? []" :key="i" class="info-skill">
+          <b>「{{ sk.name }}」</b><span>{{ sk.desc }}</span>
+        </div>
+        <div class="info-note">阵营：{{ factionName(generalOf(inspectSeat)?.faction) }}</div>
+        <button class="scroll-btn" @click="inspectSeat = null">关 闭</button>
+      </div>
+    </div>
 
     <!-- 结算面板（卷轴） -->
     <div v-if="result" class="modal-mask" @click.self="result = null">

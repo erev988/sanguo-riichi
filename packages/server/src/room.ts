@@ -146,8 +146,18 @@ export class Room {
     return true;
   }
 
-  /** 房主：添加一个 AI 占位（武将随机） */
-  addAI(bySeat: number): boolean {
+  /** 未开局时更换武将（入座后在大厅选将） */
+  setGeneral(seat: number, generalId: string): boolean {
+    if (this.started) return false;
+    const m = this.members.get(seat);
+    const g = generalById(generalId);
+    if (!m || !g) return false;
+    m.generalId = g.id;
+    this.broadcastRoom();
+    return true;
+  }
+
+  /** 房主：添加一个 AI 占位（武将随机） */  addAI(bySeat: number): boolean {
     if (this.started || bySeat !== this.hostSeat) return false;
     const seat = this.firstFreeSeat();
     if (seat < 0) return false;
@@ -190,6 +200,11 @@ export class Room {
       case 'addAI':
         this.addAI(seat);
         break;
+      case 'pickGeneral': {
+        const gid = (msg as { generalId?: string }).generalId;
+        if (gid) this.setGeneral(seat, gid);
+        break;
+      }
       case 'replay': {
         ws.send(JSON.stringify({ t: 'replay', replay: this.replay() }));
         break;
