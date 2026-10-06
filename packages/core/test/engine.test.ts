@@ -176,8 +176,8 @@ describe('无役和牌能力（forceWin，默认关闭）', () => {
     expect(r.error).toBeFalsy();
     const agaru = r.effects.find((e) => e.type === 'agaru');
     if (agaru?.type !== 'agaru') throw new Error('未和牌');
-    expect(agaru.han).toBe(0); // 0 番和牌
-    expect(agaru.yaku.length).toBeGreaterThan(0); // 仍会标注来源
+    expect(agaru.han).toBe(0); // 0 番和牌（无役、也无宝牌，役列表为空）
+    expect(agaru.yaku).toEqual([]);
   });
 });
 
