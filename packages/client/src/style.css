@@ -735,6 +735,34 @@ button.join {
   color: var(--paper-dim);
 }
 
+/* 日志：可折叠（精简模式默认只留最新一条） */
+.log-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.log-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--paper-dim);
+  letter-spacing: 0.1em;
+}
+
+.log.folded {
+  height: 26px;
+  max-height: 26px;
+  padding: 2px 8px;
+}
+
+.mini-count {
+  font-size: 11px;
+  color: var(--paper-dim);
+}
+
 /* ---------- 日志（卷轴感） ---------- */
 .log {
   margin-top: 14px;

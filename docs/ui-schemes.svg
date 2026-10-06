@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  三国麻雀 · 局内界面三方案线框（浏览器直接打开即可查看）
+  A 极简（推荐，当前默认） / B 经典（雀魂式） / C 抽屉
+  配色沿用「竹简水墨」：墨 #17150f / 宣纸 #e9e2d3 / 竹青 #4b6b52 / 朱砂 #a4352c / 黄铜 #c9a227
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 420" font-family="'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif">
+  <rect width="1560" height="420" fill="#0f0d0a"/>
+
+  <!-- ============ 方案 A：极简（推荐） ============ -->
+  <g transform="translate(20,20)">
+    <text x="0" y="16" fill="#c9a227" font-size="15" font-weight="bold">A · 极简（推荐 / 当前默认）</text>
+    <text x="0" y="34" fill="#a79c86" font-size="11">牌桌为王：对手只显示「手牌 N 张」，日志折叠成一行</text>
+
+    <rect x="0" y="44" width="480" height="300" rx="4" fill="#17150f" stroke="#3a352a"/>
+    <!-- 顶栏 -->
+    <rect x="8" y="52" width="464" height="22" rx="3" fill="#211d16" stroke="#3a352a"/>
+    <text x="16" y="67" fill="#e9e2d3" font-size="11">东1局 · 供托0 · 剩63</text>
+    <text x="150" y="67" fill="#c9a227" font-size="11">宝牌 [1s]</text>
+    <text x="360" y="67" fill="#a79c86" font-size="10">[音效][精简][录像]</text>
+
+    <!-- 对家 -->
+    <rect x="120" y="80" width="240" height="34" rx="3" fill="none" stroke="#c9a227" stroke-dasharray="3 3"/>
+    <text x="128" y="95" fill="#e9e2d3" font-size="11">对家 東 · 25000 · 立直</text>
+    <text x="128" y="108" fill="#a79c86" font-size="10">手牌 13　副露 [■■■]</text>
+
+    <!-- 左右家 -->
+    <rect x="8" y="120" width="100" height="130" rx="3" fill="none" stroke="#3a352a"/>
+    <text x="16" y="136" fill="#e9e2d3" font-size="11">上家 南</text>
+    <text x="16" y="150" fill="#c9a227" font-size="11">24000</text>
+    <text x="16" y="164" fill="#a79c86" font-size="10">手牌 13</text>
+
+    <rect x="372" y="120" width="100" height="130" rx="3" fill="none" stroke="#3a352a"/>
+    <text x="380" y="136" fill="#e9e2d3" font-size="11">下家 西</text>
+    <text x="380" y="150" fill="#c9a227" font-size="11">26000</text>
+    <text x="380" y="164" fill="#a79c86" font-size="10">手牌 13</text>
+
+    <!-- 中央 -->
+    <rect x="180" y="120" width="120" height="130" rx="3" fill="#0f0d0a" stroke="#3a352a"/>
+    <text x="196" y="142" fill="#c9a227" font-size="13">东1局</text>
+    <text x="196" y="158" fill="#a79c86" font-size="10">東南西北</text>
+    <text x="196" y="174" fill="#a79c86" font-size="10">宝牌 [1s]</text>
+    <text x="196" y="190" fill="#a79c86" font-size="10">剩 63 张</text>
+    <text x="196" y="214" fill="#6b6357" font-size="9">（弃牌环绕四周）</text>
+
+    <!-- 自己 -->
+    <rect x="8" y="256" width="464" height="80" rx="3" fill="none" stroke="#c9a227"/>
+    <text x="16" y="272" fill="#e9e2d3" font-size="11">你 南「关羽·武圣」</text>
+    <text x="330" y="272" fill="#c9a227" font-size="11">25000</text>
+    <text x="404" y="272" fill="#a4352c" font-size="11">⏱ 32s</text>
+    <rect x="16" y="280" width="448" height="34" rx="3" fill="#e9e2d3" opacity="0.92"/>
+    <text x="24" y="302" fill="#231815" font-size="11">🀇 🀈 🀉 🀊 🀋 🀌 🀍 🀎 🀏 🀐 🀑 🀒 🀓  🀔</text>
+    <text x="16" y="328" fill="#a79c86" font-size="10">[自摸] [荣和 1s] [过]</text>
+
+    <!-- 日志（折叠） -->
+    <rect x="8" y="340" width="464" height="0" fill="none"/>
+  </g>
+
+  <!-- ============ 方案 B：经典（雀魂式） ============ -->
+  <g transform="translate(530,20)">
+    <text x="0" y="16" fill="#c9a227" font-size="15" font-weight="bold">B · 经典（雀魂式）</text>
+    <text x="0" y="34" fill="#a79c86" font-size="11">四家各自带牌背与弃牌区，信息多、上手慢</text>
+
+    <rect x="0" y="44" width="480" height="300" rx="4" fill="#17150f" stroke="#3a352a"/>
+    <rect x="8" y="52" width="464" height="22" rx="3" fill="#211d16" stroke="#3a352a"/>
+    <text x="16" y="67" fill="#e9e2d3" font-size="11">东1局 · 宝牌[1s] · 剩63 · 供托0</text>
+
+    <!-- 对家 + 牌背 + 弃牌 -->
+    <text x="180" y="92" fill="#e9e2d3" font-size="11">对家 東 25000</text>
+    <rect x="120" y="98" width="240" height="14" rx="2" fill="#2c4436" stroke="#3a352a"/>
+    <text x="130" y="109" fill="#a79c86" font-size="9">🀫🀫🀫🀫🀫🀫🀫🀫🀫🀫🀫🀫🀫</text>
+    <text x="160" y="126" fill="#6b6357" font-size="9">弃牌 弃牌 弃牌 弃牌 弃牌</text>
+
+    <!-- 左右 + 牌背竖排 + 弃牌竖排 -->
+    <rect x="8" y="130" width="90" height="120" rx="3" fill="none" stroke="#3a352a"/>
+    <text x="16" y="146" fill="#e9e2d3" font-size="11">上家 南 24000</text>
+    <text x="16" y="164" fill="#6b6357" font-size="9">🀫🀫🀫 ×13 （竖排）</text>
+    <text x="16" y="186" fill="#6b6357" font-size="9">弃牌（竖排）</text>
+
+    <rect x="382" y="130" width="90" height="120" rx="3" fill="none" stroke="#3a352a"/>
+    <text x="390" y="146" fill="#e9e2d3" font-size="11">下家 西 26000</text>
+    <text x="390" y="164" fill="#6b6357" font-size="9">🀫🀫🀫 ×13</text>
+
+    <!-- 中央 -->
+    <rect x="180" y="130" width="120" height="120" rx="3" fill="#0f0d0a" stroke="#3a352a"/>
+    <text x="196" y="152" fill="#c9a227" font-size="12">东1局</text>
+    <text x="196" y="170" fill="#a79c86" font-size="10">宝牌 [1s]</text>
+    <text x="196" y="186" fill="#a79c86" font-size="10">剩 63</text>
+    <text x="160" y="246" fill="#6b6357" font-size="9">弃牌 弃牌 弃牌 弃牌 弃牌</text>
+
+    <!-- 自己 -->
+    <rect x="8" y="256" width="464" height="80" rx="3" fill="none" stroke="#c9a227"/>
+    <text x="16" y="272" fill="#e9e2d3" font-size="11">你 南「武圣」25000  ⏱32s</text>
+    <rect x="16" y="280" width="448" height="34" rx="3" fill="#e9e2d3" opacity="0.92"/>
+    <text x="24" y="302" fill="#231815" font-size="11">🀇 🀈 🀉 🀊 🀋 🀌 🀍 🀎 🀏 🀐 🀑 🀒 🀓  🀔</text>
+    <text x="16" y="328" fill="#a79c86" font-size="10">[自摸] [荣和] [过]　—— 风格同 A</text>
+
+    <!-- 日志固定区 -->
+    <rect x="8" y="336" width="464" height="0" fill="none"/>
+    <text x="16" y="342" fill="#6b6357" font-size="9">（日志固定高度区，内部滚动）</text>
+  </g>
+
+  <!-- ============ 方案 C：抽屉 ============ -->
+  <g transform="translate(1040,20)">
+    <text x="0" y="16" fill="#c9a227" font-size="15" font-weight="bold">C · 抽屉式</text>
+    <text x="0" y="34" fill="#a79c86" font-size="11">主界面同 A，额外信息（弃牌统计/日志/点数）收进右侧抽屉</text>
+
+    <rect x="0" y="44" width="480" height="300" rx="4" fill="#17150f" stroke="#3a352a"/>
+    <rect x="8" y="52" width="360" height="22" rx="3" fill="#211d16" stroke="#3a352a"/>
+    <text x="16" y="67" fill="#e9e2d3" font-size="11">东1局 · 剩63 · 宝牌[1s]</text>
+    <rect x="376" y="52" width="96" height="22" rx="3" fill="#2b2620" stroke="#3a352a"/>
+    <text x="386" y="67" fill="#c9a227" font-size="10">[☰ 信息]</text>
+
+    <rect x="368" y="80" width="104" height="230" rx="3" fill="#141b28" stroke="#3a352a"/>
+    <text x="378" y="98" fill="#e9e2d3" font-size="10">抽屉</text>
+    <text x="378" y="116" fill="#a79c86" font-size="9">· 各家中/弃牌数</text>
+    <text x="378" y="132" fill="#a79c86" font-size="9">· 完整日志</text>
+    <text x="378" y="148" fill="#a79c86" font-size="9">· 点数变化明细</text>
+    <text x="378" y="164" fill="#a79c86" font-size="9">· 宝牌/供托详情</text>
+
+    <rect x="8" y="80" width="352" height="230" rx="3" fill="none" stroke="#3a352a"/>
+    <text x="16" y="96" fill="#a79c86" font-size="10">（此处与方案 A 完全相同：对家 / 左右 / 中央 / 自己）</text>
+
+    <rect x="8" y="316" width="352" height="20" rx="3" fill="#211d16" stroke="#3a352a"/>
+    <text x="16" y="330" fill="#a79c86" font-size="9">日志折叠一行（同 A）</text>
+  </g>
+
+  <!-- 底部说明 -->
+  <text x="20" y="404" fill="#6b6357" font-size="11">
+    说明：三者核心差异在于「对手手牌背面」「日志」「弃牌统计」这三块最占空间的信息放哪。
+    当前实现 = A（极简）为默认，右上角「精简」开关可切回完整信息。
+  </text>
+</svg>

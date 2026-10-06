@@ -77,7 +77,11 @@ const dealer = ref(0);
 const timerEnd = ref(0);
 const timerTotal = ref(35000);
 const nowTick = ref(Date.now());
-/** 视口尺寸（手牌自适应缩放，保证一整条且不撑破布局） */
+/** 精简模式（默认开）：收起对手牌背与日志，只留牌桌关键信息 */
+const compact = ref(localStorage.getItem('sanguo-compact') !== '0');
+/** 日志展开（精简模式下默认收起，只留最新一条） */
+const logOpen = ref(false);
+watch(compact, (v) => localStorage.setItem('sanguo-compact', v ? '1' : '0'));
 const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
 const vh = ref(typeof window !== 'undefined' ? window.innerHeight : 800);
 
@@ -820,6 +824,7 @@ onBeforeUnmount(() => {
         <span class="round">{{ shown.roundText }} {{ shown.honbaText }}</span>
         <span class="tools">
           <label class="opt"><input v-model="soundOn" type="checkbox" />音效</label>
+          <label class="opt"><input v-model="compact" type="checkbox" />精简</label>
           <button class="mini" @click="net.send({ t: 'replay' })">看录像</button>
         </span>
         <span>供托 {{ shown.riichiSticks }} ｜ {{ currentGeneral?.name }}「{{ currentGeneral?.skills[0]?.name }}」</span>
@@ -865,9 +870,10 @@ onBeforeUnmount(() => {
             <span class="who"><em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<em class="general">「{{ generalNameOf(seats.top) }}·{{ skillNameOf(seats.top) }}」</em><span v-if="shown.riichi[seats.top]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.top] }}</span>
           </header>
-          <div class="row backs">
+          <div v-if="!compact" class="row backs">
             <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
           </div>
+          <span v-else class="mini-count">手牌 {{ shown.handCounts[seats.top] }}</span>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.top]" :key="i" class="meld-group">
               <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
@@ -880,9 +886,10 @@ onBeforeUnmount(() => {
             <span class="who"><em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<em class="general">「{{ generalNameOf(seats.left) }}·{{ skillNameOf(seats.left) }}」</em><span v-if="shown.riichi[seats.left]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.left] }}</span>
           </header>
-          <div class="row backs">
+          <div v-if="!compact" class="row backs">
             <TileSprite v-for="i in shown.handCounts[seats.left]" :key="i" back :size="18" />
           </div>
+          <span v-else class="mini-count">手牌 {{ shown.handCounts[seats.left] }}</span>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.left]" :key="i" class="meld-group">
               <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
@@ -955,9 +962,10 @@ onBeforeUnmount(() => {
             <span class="who"><em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<em class="general">「{{ generalNameOf(seats.right) }}·{{ skillNameOf(seats.right) }}」</em><span v-if="shown.riichi[seats.right]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.right] }}</span>
           </header>
-          <div class="row backs">
+          <div v-if="!compact" class="row backs">
             <TileSprite v-for="i in shown.handCounts[seats.right]" :key="i" back :size="18" />
           </div>
+          <span v-else class="mini-count">手牌 {{ shown.handCounts[seats.right] }}</span>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.right]" :key="i" class="meld-group">
               <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :rotated="isCalled(m, j)" :size="20" />
@@ -1011,8 +1019,16 @@ onBeforeUnmount(() => {
 
       <p v-if="ended && !replayActive" class="ended">—— {{ reason }} ——</p>
 
-      <div class="log">
-        <p v-for="(l, i) in shown.logs" :key="i">{{ l }}</p>
+      <div class="log-wrap">
+        <span class="log-head">
+          日志
+          <button v-if="compact" class="mini" @click="logOpen = !logOpen">
+            {{ logOpen ? '收起 ▴' : '展开 ▾' }}
+          </button>
+        </span>
+        <div class="log" :class="{ folded: compact && !logOpen }">
+          <p v-for="(l, i) in compact && !logOpen ? shown.logs.slice(0, 1) : shown.logs" :key="i">{{ l }}</p>
+        </div>
       </div>
     </template>
 
