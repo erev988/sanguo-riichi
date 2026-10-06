@@ -321,7 +321,13 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       applyPayments(s, payments, opts);
       s.riichiSticks = 0;
       s.lastResult = { winners: [winner], tenpai: s.players.map((p) => p.log.tenpai) };
-      effects.push({ type: 'agaru', winner, kind: 'tsumo', han: win.han, fu: win.fu, yaku: win.yaku, payments, skills: skillLog });
+      effects.push({
+        type: 'agaru', winner, kind: 'tsumo', han: win.han, fu: win.fu, yaku: win.yaku, payments,
+        skills: skillLog,
+        hand: [...s.players[winner].hand],
+        melds: [...s.players[winner].openMelds],
+        winTile: agariPai,
+      });
       effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
       finish(s, effects, 'normal');
       break;
@@ -363,7 +369,13 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (first) s.riichiSticks = 0;
       s.agariThisTurn.push(winner);
       clearIppatsu(s);
-      effects.push({ type: 'agaru', winner, kind: 'ron', han: win2.han, fu: win2.fu, yaku: win2.yaku, payments, skills: skillLog });
+      effects.push({
+        type: 'agaru', winner, kind: 'ron', han: win2.han, fu: win2.fu, yaku: win2.yaku, payments,
+        skills: skillLog,
+        hand: [...s.players[winner].hand, action.tile],
+        melds: [...s.players[winner].openMelds],
+        winTile: action.tile,
+      });
       effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
       // 不立即结束：等待其他家荣和（一炮多响），由 pass 收尾
       break;

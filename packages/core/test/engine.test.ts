@@ -181,6 +181,33 @@ describe('无役和牌能力（forceWin，默认关闭）', () => {
   });
 });
 
+describe('和牌事件携带牌型（供结算面板展示，和牌即公开）', () => {
+  it('自摸：hand 14 张、winTile 为和牌张、melds 为空', () => {
+    const s = dummyState();
+    s.turnCount = 10;
+    s.awaiting = 'discard';
+    s.players[0].hand = [1, 2, 3, 14, 15, 16, 24, 25, 26, 36, 36, 36, 35, 35];
+    const r = step(s, { type: 'tsumo' }, noSkills());
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    expect(agaru.hand?.length).toBe(14);
+    expect(agaru.winTile).toBe(35); // 摸了白
+    expect(agaru.melds).toEqual([]);
+  });
+
+  it('荣和：手牌 13 张 + 和牌张 = 14 张', () => {
+    const s = dummyState();
+    s.players[0].hand = [1, 2, 3, 14, 15, 16, 24, 25, 26, 35, 35, 5, 5];
+    s.lastDiscard = { player: 1, tile: 35 };
+    const r = step(s, { type: 'ron', player: 0, tile: 35, from: 1 }, noSkills());
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    expect(agaru.hand?.length).toBe(14);
+    expect(agaru.hand?.filter((t) => t === 35).length).toBe(3); // 手里 2 张 + 和牌张
+    expect(agaru.winTile).toBe(35);
+  });
+});
+
 describe('引擎：飞人规则（雀魂）', () => {
   it('有人点数为负立即终局，reason = tobi', () => {
     const s = dummyState();

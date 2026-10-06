@@ -58,6 +58,8 @@ export class Room {
   private thinkTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** 各座位当前决策点的计时截止时间（用于防止点击按钮重置计时） */
   private thinkDeadline = new Map<number, number>();
+  /** 本局内已超时过的座位：之后思考时限改为 10s（新局重置） */
+  private timedOutPlayers = new Set<number>();
   private ronTimer?: ReturnType<typeof setTimeout>;
   private nextTimer?: ReturnType<typeof setTimeout>;
   private started = false;
@@ -280,26 +282,30 @@ export class Room {
     );
   }
 
-  /** 思考时限：25 秒基本 + 10 秒补时；同一决策点内不因点击而重置（防刷时间） */
+  /**
+   * 思考时限：默认 25s + 10s 补时（35s）；一旦该玩家超时过，本局内之后只用 10s。
+   * 同一决策点内不因点击而重置（防刷时间）。
+   */
   private startThinkTimer(seat: number): void {
     const now = Date.now();
     const existing = this.thinkDeadline.get(seat);
     if (existing != null && existing > now) return; // 该决策点已在计时 → 保持剩余时间
     this.clearThinkTimer(seat);
-    const TOTAL = 35_000; // 25s + 10s
+    const TOTAL = this.timedOutPlayers.has(seat) ? 10_000 : 35_000;
     const deadline = now + TOTAL;
     this.thinkDeadline.set(seat, deadline);
     this.sendTo(seat, { type: 'timer', seat, ms: TOTAL, total: TOTAL, targetSeat: seat });
     const t = setTimeout(() => {
       this.thinkTimers.delete(seat);
       this.thinkDeadline.delete(seat);
+      this.timedOutPlayers.add(seat); // 记下：该玩家已超时，之后只用 10s
       if (!this.state || this.state.phase !== 'playing') return;
       const st = this.state;
       if (st.lastDiscard || st.pendingKakan) {
         this.act(seat, { type: 'pass' }); // 响应窗口：自动过
       } else if (st.current === seat && st.awaiting === 'discard') {
         const p = st.players[seat];
-        const tile = p.hand[p.hand.length - 1]; // 自动打出刚摸的牌
+        const tile = p.hand[p.hand.length - 1]; // 自动摸切（打出刚摸的牌）
         if (tile != null) this.act(seat, { type: 'discard', tile });
       }
     }, TOTAL);
@@ -418,6 +424,7 @@ export class Room {
     this.rounds = [];
     this.currentActions = [];
     this.roundStart = { round: this.state.round, dealer: this.state.dealer };
+    this.timedOutPlayers.clear(); // 新局：重置超时标记
     this.broadcastRoom(); // 通知全房间：已开局（含成员/AI 情况）
 
     const effects: GameEffect[] = [
@@ -539,6 +546,7 @@ export class Room {
       if (next === this.state) return; // 整场结束
       this.state = next;
       this.roundStart = { round: next.round, dealer: next.dealer };
+      this.timedOutPlayers.clear(); // 新局：重置超时标记
       const effects: GameEffect[] = [
         { type: 'gameStarted', round: next.round, dealer: next.dealer, seats: this.seatInfos() },
         { type: 'dora', indicators: next.doraIndicators.slice(0, next.doraCount) },

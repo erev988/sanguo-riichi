@@ -110,6 +110,10 @@ interface ResultInfo {
   skills: string[];
   /** 和牌时各技能的数值影响 */
   skillDetails: { skill: string; han: number; fu: number }[];
+  /** 和牌者牌型（和牌即公开） */
+  hand?: Tile[];
+  melds?: Meld[];
+  winTile?: Tile;
   tenpai?: boolean[];
   yakuman: boolean;
 }
@@ -181,6 +185,19 @@ const liveFrame = computed<Frame>(() => ({
 
 const replayFrame = computed<Frame | null>(() => replayFrames.value[replayIdx.value] ?? null);
 const shown = computed<Frame>(() => (replayActive.value ? (replayFrame.value ?? liveFrame.value) : liveFrame.value));
+
+/** 牌序：万→饼→索→字（赤 5 归入 5 的位置） */
+const normTile = (t: Tile): number => (t === 0 ? 5 : t === 10 ? 15 : t === 20 ? 25 : t);
+function sortTiles(tiles: Tile[]): Tile[] {
+  return [...tiles].sort((a, b) => normTile(a) - normTile(b));
+}
+
+/** 和牌张在排序后手牌中的标记位置（-1 表示无） */
+const winTileMark = computed(() => {
+  const r = result.value;
+  if (!r?.hand || r.winTile == null) return -1;
+  return sortTiles(r.hand).indexOf(r.winTile);
+});
 
 /** 手牌主体（不含刚摸的牌），并按牌面排序（万→饼→索→字；赤 5 归入 5 的位置） */
 const handCore = computed(() => {
@@ -426,6 +443,9 @@ function handleEffect(e: GameEffect): void {
         delta,
         skills: [...skillBuffer],
         skillDetails: e.skills ?? [],
+        hand: e.hand,
+        melds: e.melds,
+        winTile: e.winTile,
         yakuman,
       };
       // 和牌技能也在顶部提示一次
@@ -1193,6 +1213,21 @@ onBeforeUnmount(() => {
               <span v-for="(y, i) in result.yaku" :key="i" class="yaku-tag">{{ y }}</span>
             </div>
             <div class="detail-line">{{ result.detail }}</div>
+            <div v-if="result.hand?.length" class="shape-line">
+              <span class="shape-label">牌型（和牌张以朱砂框标出）</span>
+              <span class="shape-tiles">
+                <TileSprite
+                  v-for="(t, i) in sortTiles(result.hand)"
+                  :key="i"
+                  :tile="t"
+                  :size="26"
+                  :class="{ 'win-tile': i === winTileMark }"
+                />
+                <span v-for="(m, i) in result.melds ?? []" :key="'m' + i" class="shape-meld">
+                  <TileSprite v-for="(t, j) in m.tiles" :key="j" :tile="t" :size="26" />
+                </span>
+              </span>
+            </div>
           </template>
           <template v-else>
             <div class="tenpai-line">

@@ -51,6 +51,12 @@ export type GameEffect =
       payments: Payment[];
       /** 本局和牌时各技能的影响（改了多少番/符） */
       skills?: { skill: string; han: number; fu: number }[];
+      /** 和牌者手牌（含和牌张；和牌即公开） */
+      hand?: number[];
+      /** 和牌者的副露 */
+      melds?: Meld[];
+      /** 和牌张 */
+      winTile?: number;
     }
   | { type: 'ryukyoku'; tenpai: boolean[]; payments: Payment[]; kind?: 'howanpai' | 'kyuushu' | 'suufon' | 'suukantsu' | 'suuchariichi' }
   | { type: 'gameEnded'; scores: number[]; reason: 'normal' | 'tobi' | 'ryukyoku' };
