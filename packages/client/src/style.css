@@ -1228,3 +1228,63 @@ button.join {
   justify-content: center;
   margin-top: 2px;
 }
+
+/* ---------- 牌河修正：紧贴中央方块，打多了换列不消失 ---------- */
+.river-mid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 4px;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.river-left,
+.river-right {
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-flow: column wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 2px;
+  overflow: hidden;
+}
+
+/* 左河贴住方块右边，右河贴住方块左边 */
+.river-left {
+  justify-self: end;
+}
+
+.river-right {
+  justify-self: start;
+}
+
+/* 上下牌河允许换到第二行 */
+.river-top,
+.river-bottom {
+  max-height: 46px;
+}
+
+/* ---------- 立直按钮（朱砂，选中态镀铜） ---------- */
+button.riichi {
+  background: linear-gradient(180deg, #b0392e 0%, #8a2a22 100%);
+  border-color: #7d251e;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+button.riichi.active {
+  outline: 2px solid var(--brass);
+  outline-offset: 1px;
+}
+
+/* ---------- 自己区域：按钮在手牌上方 ---------- */
+.seat.self {
+  justify-content: center;
+  gap: 4px;
+}
+
+.seat.self .controls {
+  margin: 0 0 2px;
+}

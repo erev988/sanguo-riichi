@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   ALL_GENERALS,
+  calcTenpai,
   replayGame,
   tileName,
   type Action,
@@ -707,9 +708,29 @@ function doOption(a: Action): void {
   myOptions.value = [];
 }
 
+/** 自己要显示的操作按钮（排除"打牌/摸牌"这两类由点手牌与自动摸牌处理） */
+const visibleOptions = computed(() =>
+  myOptions.value.filter((a) => a.type !== 'discard' && a.type !== 'draw'),
+);
+
+/** 立直模式：点「立直」后，点哪张手牌就带立直打出 */
+const riichiMode = ref(false);
+
+/** 当前能否立直（门清、未立直、14 张、且存在打出后即听牌的牌） */
+const canRiichiNow = computed(() => {
+  const me = mySeat.value;
+  if (me == null || replayActive.value || ended.value) return false;
+  const h = shown.value.hands[me] ?? [];
+  if (h.length !== 14) return false;
+  if (shown.value.riichi[me]) return false;
+  if ((shown.value.melds[me] ?? []).length > 0) return false;
+  return h.some((_, i) => calcTenpai(h.filter((_, j) => j !== i)).length > 0);
+});
+
 function discardTile(t: Tile): void {
   if (ended.value || replayActive.value) return;
-  act({ type: 'discard', tile: t });
+  act({ type: 'discard', tile: t, riichi: riichiMode.value });
+  riichiMode.value = false;
 }
 
 function ron(): void {
@@ -991,8 +1012,26 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <!-- 自己：副露 + 手牌（居中） + 操作 -->
+        <!-- 自己：操作按钮在上，副露与手牌在下（均居中） -->
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
+          <div v-if="!replayActive" class="controls">
+            <button
+              v-if="canRiichiNow"
+              class="riichi"
+              :class="{ active: riichiMode }"
+              @click="riichiMode = !riichiMode"
+            >
+              {{ riichiMode ? '立直：请点手牌' : '立直' }}
+            </button>
+            <button
+              v-for="(a, i) in visibleOptions"
+              :key="i"
+              :class="{ ron: a.type === 'ron', strong: a.type === 'tsumo' }"
+              @click="doOption(a)"
+            >
+              {{ optionLabel(a) }}
+            </button>
+          </div>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
               <TileSprite
@@ -1022,16 +1061,6 @@ onBeforeUnmount(() => {
             <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
               {{ remainSec }}s
             </span>
-          </div>
-          <div v-if="!replayActive" class="controls">
-            <button
-              v-for="(a, i) in myOptions"
-              :key="i"
-              :class="{ ron: a.type === 'ron', strong: a.type === 'tsumo' }"
-              @click="doOption(a)"
-            >
-              {{ optionLabel(a) }}
-            </button>
           </div>
         </section>
       </div>

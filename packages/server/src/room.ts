@@ -294,27 +294,30 @@ export class Room {
     if (!this.state || this.state.phase !== 'playing') return;
     const st = this.state;
     const all = legalActions(st);
-    const decisionTypes = ['discard', 'tsumo', 'ron', 'chii', 'pon', 'kan', 'ankan', 'kakan', 'pass', 'kyuushu'];
     for (let seat = 0; seat < 4; seat++) {
       const m = this.members.get(seat);
       if (!m || m.isAI) continue;
       const acts = all.filter((a) => {
+        // 打牌由"点手牌"完成、摸牌自动 —— 不下发这两类，只下发需要决策的动作
+        if (a.type === 'discard' || a.type === 'draw') return false;
         const p = (a as { player?: number }).player;
         if (p != null) return p === seat; // 副露/荣和：声明者自己
-        return seat === st.current; // 摸/打/自摸/过/九种九牌：当前行动者
+        return seat === st.current; // 自摸/过/九种九牌：当前行动者
       });
-      if (acts.length === 0) {
-        this.clearThinkTimer(seat);
-        continue;
+      if (acts.length > 0) {
+        m.ws?.send(
+          JSON.stringify({
+            t: 'events',
+            effects: [{ type: 'options', actions: acts, targetSeat: seat }],
+            revision: st.version,
+          }),
+        );
       }
-      m.ws?.send(
-        JSON.stringify({
-          t: 'events',
-          effects: [{ type: 'options', actions: acts, targetSeat: seat }],
-          revision: st.version,
-        }),
-      );
-      if (acts.some((a) => decisionTypes.includes(a.type))) this.startThinkTimer(seat);
+      // 需要决策（有按钮）或需要打牌 → 起思考计时
+      const needsThink =
+        acts.length > 0 ||
+        (st.awaiting === 'discard' && st.current === seat && !st.lastDiscard && !st.pendingKakan);
+      if (needsThink) this.startThinkTimer(seat);
       else this.clearThinkTimer(seat);
     }
   }
