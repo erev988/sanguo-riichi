@@ -66,8 +66,25 @@ const doraIndicators = ref<Tile[]>([]);
 const wallCount = ref(0);
 /** 本局庄家座位 */
 const dealer = ref(0);
+/** 思考时限（本地倒计时） */
+const timerEnd = ref(0);
+const timerTotal = ref(35000);
+const nowTick = ref(Date.now());
 /** 视口宽度（手牌自适应缩放，保证一整条不换行） */
 const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
+
+/** 剩余秒数（无计时为 null） */
+const remainSec = computed(() => {
+  if (timerEnd.value <= 0) return null;
+  const ms = timerEnd.value - nowTick.value;
+  if (ms <= 0) return 0;
+  return Math.ceil(ms / 1000);
+});
+/** 是否进入补时（最后 10 秒） */
+const inExtraTime = computed(() => {
+  if (remainSec.value == null) return false;
+  return Math.max(0, timerEnd.value - nowTick.value) <= 10000;
+});
 
 // ---- 结算面板 ----
 interface ResultInfo {
@@ -143,10 +160,10 @@ const handCore = computed(() => {
   return [...body].sort((a, b) => norm(a) - norm(b));
 });
 
-/** 手牌牌高：随视口与张数自适应，保证 13/14 张始终一整条 */
+/** 手牌牌高：随视口与张数自适应，保证 13/14 张始终一整条（并与副露分开） */
 const handTileSize = computed(() => {
-  const n = Math.max(13, (handCore.value.length ?? 13) + 1);
-  return Math.max(28, Math.min(58, Math.floor((vw.value - 72) / n)));
+  const n = (handCore.value.length ?? 13) + 1;
+  return Math.max(26, Math.min(48, Math.floor((vw.value - 56) / Math.max(13, n))));
 });
 
 /** 风位：庄家为东，逆时针（座位号 +1）依次 南西北 */
@@ -244,6 +261,7 @@ function handleEffect(e: GameEffect): void {
       const [rt, ht] = roundLabel(e.round);
       roundText.value = rt;
       honbaText.value = ht;
+      dealer.value = e.dealer;
       scores.value = e.seats.map((s) => s.score);
       discards.value = [[], [], [], []];
       melds.value = [[], [], []].concat([[]]) as Meld[][];
@@ -252,6 +270,8 @@ function handleEffect(e: GameEffect): void {
       handCounts.value = [13, 13, 13, 13];
       lastDrawn.value = null;
       ended.value = false;
+      timerEnd.value = 0;
+      myOptions.value = [];
       skillBuffer = [];
       break;
     }
@@ -266,6 +286,12 @@ function handleEffect(e: GameEffect): void {
       break;
     case 'wall':
       wallCount.value = e.count;
+      break;
+    case 'timer':
+      if (e.targetSeat === mySeat.value) {
+        timerTotal.value = e.total;
+        timerEnd.value = Date.now() + e.ms;
+      }
       break;
     case 'drawn':
       if (e.player === mySeat.value) lastDrawn.value = e.tile;
@@ -498,6 +524,7 @@ watch([replayPlaying, replaySpeed], () => {
 });
 
 function connect(): void {
+  void enterFullscreenLandscape(); // 移动端：自动进入全屏并锁横屏
   net.onOpen = () => {
     connected.value = true;
     status.value = '入座中…';
@@ -586,13 +613,35 @@ watch(soundOn, (v) => {
   sfx.enabled = v;
 });
 
+/** 移动端：请求全屏并锁定横屏（不支持则用 CSS 兜底旋转） */
+async function enterFullscreenLandscape(): Promise<void> {
+  try {
+    const el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      await el.requestFullscreen({ navigationUI: 'hide' });
+    }
+    const orientation = (screen as unknown as { orientation?: { lock?: (o: string) => Promise<void> } })
+      .orientation;
+    if (orientation?.lock) await orientation.lock('landscape');
+  } catch {
+    /* 忽略：不支持时由 CSS 强制横屏 */
+  }
+}
+
 function onResize(): void {
   vw.value = window.innerWidth;
 }
-if (typeof window !== 'undefined') window.addEventListener('resize', onResize);
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+if (typeof window !== 'undefined') {
+  window.addEventListener('resize', onResize);
+  tickTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 250);
+}
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') window.removeEventListener('resize', onResize);
+  if (tickTimer) clearInterval(tickTimer);
   if (replayTimer) clearInterval(replayTimer);
   net.close();
 });
@@ -781,7 +830,12 @@ onBeforeUnmount(() => {
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
           <header>
             <span class="who"><em class="wind">{{ windOf(seats.self) }}</em>你 · {{ currentGeneral?.name }}<span v-if="shown.riichi[seats.self]" class="riichi"> 立直</span></span>
-            <span class="score">{{ shown.scores[seats.self] }}</span>
+            <span class="score">
+              <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
+                {{ remainSec }}s{{ inExtraTime ? '（补时）' : '' }}
+              </span>
+              {{ shown.scores[seats.self] }}
+            </span>
           </header>
           <div class="row melds">
             <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
@@ -823,12 +877,6 @@ onBeforeUnmount(() => {
         <p v-for="(l, i) in shown.logs" :key="i">{{ l }}</p>
       </div>
     </template>
-
-    <!-- 移动端：竖屏请旋转（横屏才不拥挤） -->
-    <div class="rotate-hint">
-      <span style="font-size: 28px">🀄</span>
-      <span>请将手机横屏游玩</span>
-    </div>
 
     <!-- 结算面板（卷轴） -->
     <div v-if="result" class="modal-mask" @click.self="result = null">

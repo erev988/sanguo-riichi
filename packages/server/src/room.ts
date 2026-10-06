@@ -53,6 +53,7 @@ export class Room {
   private roundStart?: { round: RoundInfo; dealer: number };
   private aiTimer?: ReturnType<typeof setTimeout>;
   private drawTimer?: ReturnType<typeof setTimeout>;
+  private thinkTimers = new Map<number, ReturnType<typeof setTimeout>>();
   private ronTimer?: ReturnType<typeof setTimeout>;
   private nextTimer?: ReturnType<typeof setTimeout>;
   private started = false;
@@ -241,11 +242,51 @@ export class Room {
     this.broadcastOptions(); // 下发各座位当前可选动作（吃/碰/杠/荣和/自摸…）
   }
 
-  /** 给每位真人单播其当前可执行动作（AI 不需要） */
+  /** 单播给某座位（私有信息） */
+  private sendTo(seat: number, effect: GameEffect): void {
+    const m = this.members.get(seat);
+    m?.ws?.send(
+      JSON.stringify({ t: 'events', effects: [effect], revision: this.state?.version ?? 0 }),
+    );
+  }
+
+  /** 思考时限：25 秒基本 + 10 秒补时；超时自动动作（打牌 / 过） */
+  private startThinkTimer(seat: number): void {
+    this.clearThinkTimer(seat);
+    const TOTAL = 35_000; // 25s + 10s
+    this.sendTo(seat, { type: 'timer', seat, ms: TOTAL, total: TOTAL, targetSeat: seat });
+    const t = setTimeout(() => {
+      this.thinkTimers.delete(seat);
+      if (!this.state || this.state.phase !== 'playing') return;
+      const st = this.state;
+      if (st.lastDiscard || st.pendingKakan) {
+        this.act(seat, { type: 'pass' }); // 响应窗口：自动过
+      } else if (st.current === seat && st.awaiting === 'discard') {
+        const p = st.players[seat];
+        const tile = p.hand[p.hand.length - 1]; // 自动打出刚摸的牌
+        if (tile != null) this.act(seat, { type: 'discard', tile });
+      }
+    }, TOTAL);
+    this.thinkTimers.set(seat, t);
+  }
+
+  private clearThinkTimer(seat?: number): void {
+    if (seat == null) {
+      for (const t of this.thinkTimers.values()) clearTimeout(t);
+      this.thinkTimers.clear();
+      return;
+    }
+    const t = this.thinkTimers.get(seat);
+    if (t) clearTimeout(t);
+    this.thinkTimers.delete(seat);
+  }
+
+  /** 给每位真人单播其当前可执行动作（AI 不需要）；需要决策的座位起思考计时 */
   private broadcastOptions(): void {
     if (!this.state || this.state.phase !== 'playing') return;
     const st = this.state;
     const all = legalActions(st);
+    const decisionTypes = ['discard', 'tsumo', 'ron', 'chii', 'pon', 'kan', 'ankan', 'kakan', 'pass', 'kyuushu'];
     for (let seat = 0; seat < 4; seat++) {
       const m = this.members.get(seat);
       if (!m || m.isAI) continue;
@@ -254,7 +295,10 @@ export class Room {
         if (p != null) return p === seat; // 副露/荣和：声明者自己
         return seat === st.current; // 摸/打/自摸/过/九种九牌：当前行动者
       });
-      if (acts.length === 0) continue;
+      if (acts.length === 0) {
+        this.clearThinkTimer(seat);
+        continue;
+      }
       m.ws?.send(
         JSON.stringify({
           t: 'events',
@@ -262,6 +306,8 @@ export class Room {
           revision: st.version,
         }),
       );
+      if (acts.some((a) => decisionTypes.includes(a.type))) this.startThinkTimer(seat);
+      else this.clearThinkTimer(seat);
     }
   }
 
@@ -334,7 +380,7 @@ export class Room {
     this.broadcastRoom(); // 通知全房间：已开局（含成员/AI 情况）
 
     const effects: GameEffect[] = [
-      { type: 'gameStarted', round: this.state.round, seats: this.seatInfos() },
+      { type: 'gameStarted', round: this.state.round, dealer: this.state.dealer, seats: this.seatInfos() },
       { type: 'dora', indicators: this.state.doraIndicators.slice(0, this.state.doraCount) },
       { type: 'wall', count: this.state.wall.length },
     ];
@@ -442,7 +488,7 @@ export class Room {
       this.state = next;
       this.roundStart = { round: next.round, dealer: next.dealer };
       const effects: GameEffect[] = [
-        { type: 'gameStarted', round: next.round, seats: this.seatInfos() },
+        { type: 'gameStarted', round: next.round, dealer: next.dealer, seats: this.seatInfos() },
         { type: 'dora', indicators: next.doraIndicators.slice(0, next.doraCount) },
         { type: 'wall', count: next.wall.length },
       ];
@@ -474,5 +520,6 @@ export class Room {
     clearTimeout(this.aiTimer);
     clearTimeout(this.ronTimer);
     clearTimeout(this.drawTimer);
+    this.clearThinkTimer();
   }
 }

@@ -21,7 +21,7 @@ export interface SeatInfo {
  * targetSeat 表示“只发给该座位”（用于手牌/摸牌等私有信息）。
  */
 export type GameEffect =
-  | { type: 'gameStarted'; round: RoundInfo; seats: SeatInfo[] }
+  | { type: 'gameStarted'; round: RoundInfo; dealer: number; seats: SeatInfo[] }
   | { type: 'hand'; player: number; tiles: Tile[]; targetSeat: number }
   | { type: 'drawn'; player: number; tile: Tile; targetSeat: number }
   | { type: 'discarded'; player: number; tile: Tile; riichi: boolean; handCount: number }
@@ -38,6 +38,8 @@ export type GameEffect =
   | { type: 'wall'; count: number }
   /** 该座位当前可执行的动作（私有，用于渲染吃/碰/杠/荣和按钮） */
   | { type: 'options'; actions: Action[]; targetSeat: number }
+  /** 该座位的思考时限（私有，客户端据此显示倒计时） */
+  | { type: 'timer'; seat: number; ms: number; total: number; targetSeat: number }
   | { type: 'scores'; scores: number[] }
   | {
       type: 'agaru';

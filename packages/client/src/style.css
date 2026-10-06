@@ -21,21 +21,55 @@
   box-sizing: border-box;
 }
 
+/* 页面固定，不允许滑动（移动端横屏后尤其重要） */
+html,
 body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
+body {
   font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
   color: var(--paper);
   background:
     radial-gradient(1200px 600px at 50% -10%, #232a22 0%, transparent 60%),
     repeating-linear-gradient(92deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 6px),
     var(--ink);
-  min-height: 100vh;
+}
+
+/* 竖屏时自动把整个界面旋转 90°（等价强制横屏，不弹提示） */
+@media (orientation: portrait) {
+  #app {
+    position: fixed;
+    top: 0;
+    left: 100vw;
+    width: 100vh;
+    height: 100vw;
+    transform: rotate(90deg);
+    transform-origin: left top;
+  }
 }
 
 .app {
   max-width: 1120px;
   margin: 0 auto;
   padding: 14px 16px 32px;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app .log {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 h1 {
@@ -170,20 +204,22 @@ button.ron:hover {
 /* ---------- 牌桌 ---------- */
 .table {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(300px, 1.7fr) minmax(150px, 1fr);
-  grid-template-rows: auto minmax(200px, auto) auto;
+  grid-template-columns: minmax(120px, 1fr) minmax(240px, 1.6fr) minmax(120px, 1fr);
+  grid-template-rows: auto minmax(150px, auto) auto;
+  /* 自己一栏横跨整行 → 手牌能一整条排开 */
   grid-template-areas:
-    '.    top    .'
-    'left center right'
-    '.    self   .';
-  gap: 10px;
-  padding: 12px;
+    'top    top    top'
+    'left   center right'
+    'self   self   self';
+  gap: 8px;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background:
     radial-gradient(140% 100% at 50% 0%, rgba(75, 107, 82, 0.16) 0%, transparent 55%),
     linear-gradient(180deg, #1d1a14 0%, #141210 100%);
   box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+  flex: 0 0 auto;
 }
 
 .seat {
@@ -366,52 +402,77 @@ button.ron:hover {
   margin-right: 3px;
 }
 
-/* ---------- 移动端：竖屏提示横屏 ---------- */
-.rotate-hint {
-  display: none;
+/* 思考倒计时（自己区域） */
+.timer {
+  display: inline-block;
+  min-width: 42px;
+  margin-right: 8px;
+  padding: 0 6px;
+  border: 1px solid rgba(201, 162, 39, 0.4);
+  border-radius: 3px;
+  color: var(--brass);
+  font-variant-numeric: tabular-nums;
 }
 
-@media (orientation: portrait) and (max-width: 900px) {
-  .table,
-  .replay-bar,
-  .topbar {
-    display: none;
-  }
-  .rotate-hint {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 40;
-    background: var(--ink);
-    color: var(--paper);
-    font-size: 16px;
-    letter-spacing: 0.16em;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+.timer.urgent {
+  border-color: var(--cinnabar);
+  color: #ff8a7a;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
   }
 }
 
-/* 横屏手机：整体压缩，保证牌桌不溢出 */
-@media (orientation: landscape) and (max-height: 480px) {
+/* 移动端横屏：紧凑，保证一屏放下 */
+@media (orientation: landscape) and (max-height: 520px) {
   .app {
-    padding: 6px 8px 12px;
     max-width: 100%;
+    padding: 6px 8px 8px;
+    gap: 4px;
   }
   h1 {
-    font-size: 15px;
-    margin: 2px 0 6px;
+    font-size: 14px;
+    margin: 0 0 4px;
+    letter-spacing: 0.2em;
+  }
+  .topbar {
+    padding: 3px 8px;
+    font-size: 11.5px;
+    margin-bottom: 4px;
   }
   .table {
-    gap: 6px;
-    padding: 8px;
+    gap: 5px;
+    padding: 6px;
   }
   .seat {
-    padding: 4px 6px;
-    min-height: 48px;
+    padding: 3px 5px;
+    min-height: 40px;
   }
-}`
+  .seat header {
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .log {
+    max-height: 84px;
+    font-size: 11.5px;
+    line-height: 1.5;
+  }
+  .controls button {
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  .field {
+    width: 84px;
+    height: 84px;
+    font-size: 10.5px;
+  }
+  .field .big {
+    font-size: 15px;
+  }
+}
 
 /* ---------- 自己的手牌 ---------- */
 .row.hand {
