@@ -45,6 +45,26 @@ wss.on('connection', (ws: WebSocket) => {
           const code = (e as Error).message === 'wrong-password' ? 'wrong-password' : 'join-failed';
           ws.send(JSON.stringify({ t: 'error', code }));
         }
+      } else if (msg.t === 'create') {
+        const { roomId, name, generalId, password, rules } = msg.payload;
+        if (rooms.has(roomId)) {
+          ws.send(JSON.stringify({ t: 'error', code: 'room-exists' }));
+          return;
+        }
+        const room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
+        rooms.set(roomId, room);
+        const { seat, started } = room.join(ws, name, generalId, rules, undefined, password);
+        ws.send(
+          JSON.stringify({
+            t: 'welcome',
+            roomId,
+            seat,
+            started,
+            protocolVersion: PROTOCOL_VERSION,
+            rules: room.rules,
+            created: true,
+          }),
+        );
       } else if (msg.t === 'rooms') {
         ws.send(JSON.stringify({ t: 'rooms', rooms: [...rooms.values()].map((r) => r.info()) }));
       } else if (msg.t === 'ping') {

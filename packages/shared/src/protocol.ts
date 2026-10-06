@@ -43,6 +43,15 @@ const RulesSchema = z
   })
   .optional();
 
+/** 创建房间 */
+export interface CreatePayload {
+  roomId: string;
+  name: string;
+  generalId: string;
+  password?: string;
+  rules?: Partial<Rules>;
+}
+
 export const ClientMsgSchema = z.discriminatedUnion('t', [
   z.object({
     t: z.literal('join'),
@@ -55,6 +64,17 @@ export const ClientMsgSchema = z.discriminatedUnion('t', [
       token: z.string().max(64).optional(),
       /** 房间密码（房主设置；加入时需匹配） */
       password: z.string().max(32).optional(),
+    }),
+  }),
+  /** 创建房间并作为房主入座（房间已存在则报 room-exists） */
+  z.object({
+    t: z.literal('create'),
+    payload: z.object({
+      roomId: z.string().min(1).max(32),
+      name: z.string().min(1).max(16),
+      generalId: z.string().max(32),
+      password: z.string().max(32).optional(),
+      rules: RulesSchema,
     }),
   }),
   z.object({ t: z.literal('act'), action: ActionSchema, seq: z.number().int().nonnegative() }),
@@ -100,6 +120,8 @@ export type ServerMsg =
       rules: Rules;
       /** 是否为断线重连（座位已恢复） */
       rejoined?: boolean;
+      /** 是否为本次创建的房间 */
+      created?: boolean;
     }
   /** 房间成员状态（供大厅显示人数/AI 数、开始按钮） */
   | { t: 'room'; members: RoomMemberInfo[]; hostSeat: number; started: boolean }

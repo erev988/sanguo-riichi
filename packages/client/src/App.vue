@@ -21,8 +21,12 @@ const sfx = new Sfx();
 const connected = ref(false);
 const status = ref('未连接');
 const name = ref('玩家');
-const roomId = ref('room1');
-const password = ref('');
+/** 创建房间用 */
+const newRoomId = ref(`room-${Math.floor(1000 + Math.random() * 9000)}`);
+const newPassword = ref('');
+/** 加入房间用 */
+const joinRoomId = ref('');
+const joinPassword = ref('');
 const generalId = ref('gen-guanyu');
 /** 已成功入座的房间（断线后自动复座；仅入座成功才记录） */
 let joinedRoom = '';
@@ -424,7 +428,13 @@ function handleMsg(msg: ServerMsg): void {
       mySeat.value = msg.seat;
       joinedRoom = msg.roomId; // 记录成功入座的房间，供断线复座
       status.value = msg.started ? '对局中' : '等待入座…';
-      pushLog(msg.rejoined ? `✅ 断线重连，恢复座位 ${msg.seat + 1}` : `入座 ${msg.seat + 1} 位`);
+      pushLog(
+        msg.created
+          ? `🏠 已创建房间 ${msg.roomId}（你是房主）`
+          : msg.rejoined
+            ? `✅ 断线重连，恢复座位 ${msg.seat + 1}`
+            : `入座 ${msg.seat + 1} 位`,
+      );
       net.send({ t: 'snapshot', seq: ++net.seq });
       break;
     case 'room':
@@ -463,10 +473,12 @@ function handleMsg(msg: ServerMsg): void {
     case 'error':
       if (msg.code === 'wrong-password') {
         joinedRoom = '';
-        status.value = '房间密码错误，请重新入座';
+        status.value = '房间密码错误';
+      } else if (msg.code === 'room-exists') {
+        status.value = '该房间名已被占用，请换一个名字';
       } else if (msg.code === 'join-failed') {
         joinedRoom = '';
-        status.value = '入座失败（房间可能已开局或已满）';
+        status.value = '加入失败（房间可能已开局或已满）';
       }
       pushLog(`错误：${msg.code}`);
       break;
@@ -558,7 +570,7 @@ function connectOnly(): void {
     connected.value = true;
     if (joinedRoom) {
       status.value = '重连中，恢复座位…';
-      sendJoin(joinedRoom); // 断线后自动复座（token 免密码）
+      sendJoin(joinedRoom, ''); // 断线后自动复座（token 免密码）
     } else {
       status.value = '已连接';
       net.send({ t: 'rooms' }); // 连上后顺手拉一次房间列表
@@ -579,7 +591,7 @@ function connectOnly(): void {
   status.value = '连接中…';
 }
 
-function sendJoin(room: string): void {
+function sendJoin(room: string, pwd: string): void {
   net.send({
     t: 'join',
     payload: {
@@ -588,24 +600,60 @@ function sendJoin(room: string): void {
       generalId: generalId.value,
       rules: { kiriageMangan: kiriageMangan.value },
       token: token.value,
-      password: password.value,
+      password: pwd,
     },
   });
 }
 
-/** 入座（连接 + 房间号 + 密码都齐了才发） */
-function joinRoom(): void {
+/** 创建房间（并作为房主进入） */
+function createRoom(): void {
   if (!connected.value) {
     status.value = '请先点「连接」';
     return;
   }
-  const room = roomId.value.trim();
+  const room = newRoomId.value.trim();
   if (!room) {
-    status.value = '请填写房间号';
+    status.value = '请填写房间名';
     return;
   }
-  status.value = '入座中…';
-  sendJoin(room);
+  status.value = '创建房间中…';
+  net.send({
+    t: 'create',
+    payload: {
+      roomId: room,
+      name: name.value,
+      generalId: generalId.value,
+      password: newPassword.value,
+      rules: { kiriageMangan: kiriageMangan.value },
+    },
+  });
+}
+
+/** 按房间号加入 */
+function joinById(room: string, pwd?: string): void {
+  if (!connected.value) {
+    status.value = '请先点「连接」';
+    return;
+  }
+  const id = room.trim();
+  if (!id) {
+    status.value = '请填写房间名';
+    return;
+  }
+  joinRoomId.value = id;
+  status.value = '加入房间中…';
+  sendJoin(id, pwd ?? joinPassword.value);
+}
+
+/** 点击列表某房的「加入」 */
+function pickRoom(r: { id: string; locked: boolean; started: boolean }): void {
+  if (r.locked) {
+    joinRoomId.value = r.id;
+    status.value = `「${r.id}」需要密码，请填写密码后点「加入」`;
+    return;
+  }
+  joinPassword.value = '';
+  joinById(r.id, '');
 }
 
 /** 刷新房间列表（需要已连接） */
@@ -716,35 +764,53 @@ onBeforeUnmount(() => {
     <h1>三国麻雀</h1>
 
     <!-- 未连接 -->
+    <!-- 未连接：玩家设置 + 连接 -->
     <template v-if="!connected">
       <div class="panel">
         <input v-model="name" placeholder="昵称" />
-        <input v-model="roomId" placeholder="房间号" />
-        <input v-model="password" type="password" placeholder="房间密码（可空）" />
         <select v-model="generalId">
           <option v-for="g in ALL_GENERALS" :key="g.id" :value="g.id">{{ g.name }}（{{ g.desc }}）</option>
         </select>
-        <label class="opt"><input v-model="kiriageMangan" type="checkbox" />切上满贯</label>
-      </div>
-      <div class="panel">
-        <button @click="connectOnly" :disabled="connected">
-          {{ connected ? '已连接' : '连接' }}
-        </button>
-        <button @click="refreshRooms" :disabled="!connected">刷新列表</button>
-        <button class="join" @click="joinRoom" :disabled="!connected">入座</button>
+        <label class="opt"><input v-model="kiriageMangan" type="checkbox" />切上满贯（建房规则）</label>
+        <button class="join" @click="connectOnly">连接</button>
         <span class="status">{{ status }}</span>
       </div>
+      <p class="hint">连接后可进入房间大厅：创建房间或加入已有房间</p>
+    </template>
 
+    <!-- 已连接但未入座：房间大厅 -->
+    <template v-else-if="mySeat === null">
       <div class="lobby">
-        <p>房间一览</p>
-        <p v-if="rooms.length === 0" class="hint">（暂无房间，连上后点「刷新列表」）</p>
-        <p class="members">
-          <span v-for="r in rooms" :key="r.id" class="room-item" @click="roomId = r.id">
-            {{ r.locked ? '🔒 ' : '' }}{{ r.id }} · {{ r.humans }} 人 + {{ r.ais }} AI ·
-            {{ r.started ? '进行中' : '待开局' }}
-          </span>
+        <p class="lobby-head">
+          房间大厅（{{ rooms.length }}）
+          <button class="mini" @click="refreshRooms">刷新</button>
         </p>
-        <p class="hint">点击房间名可填入房间号；🔒 表示需要密码（房主建房时设置的密码即为该房密码）</p>
+        <p v-if="rooms.length === 0" class="hint">还没有房间 —— 在下面创建一个开始吧</p>
+        <ul class="room-list">
+          <li v-for="r in rooms" :key="r.id">
+            <span class="room-name">{{ r.locked ? '🔒 ' : '' }}{{ r.id }}</span>
+            <span class="room-meta">
+              {{ r.humans }} 人 + {{ r.ais }} AI · {{ r.started ? '进行中' : '待开局' }}
+            </span>
+            <button class="mini" @click="pickRoom(r)">加入</button>
+          </li>
+        </ul>
+
+        <div class="lobby-forms">
+          <div class="form">
+            <h3>创建房间</h3>
+            <input v-model="newRoomId" placeholder="房间名" />
+            <input v-model="newPassword" type="password" placeholder="密码（可空）" />
+            <button class="join" @click="createRoom">创建并进入</button>
+          </div>
+          <div class="form">
+            <h3>加入房间</h3>
+            <input v-model="joinRoomId" placeholder="房间名" />
+            <input v-model="joinPassword" type="password" placeholder="密码（无则留空）" />
+            <button @click="joinById(joinRoomId)">加入</button>
+          </div>
+        </div>
+        <p class="hint">{{ status }}</p>
       </div>
     </template>
 
