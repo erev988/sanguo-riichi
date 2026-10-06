@@ -183,6 +183,40 @@ createGame(seats, { rules: { kiriageMangan: true, initialScore: 50000 } }); // �
 > 注：本仓库在沙箱环境开发时，给系统 cacache 打过补丁（`fs.link` → `copyFile`，
 > 见 `/usr/share/nodejs/cacache/lib/util/move-file.js`），仅影响沙箱内 npm 安装，与项目代码无关。
 
+## 部署
+
+### 本地运行
+
+```bash
+git clone https://github.com/erev988/sanguo-riichi.git
+cd sanguo-riichi
+npm install
+npm test              # 152 项单测
+npm run dev:server    # ws://localhost:8787
+npm run dev:client    # http://localhost:5173（开两个标签即联机）
+```
+
+### 生产部署
+
+| 部分 | 做法 |
+|---|---|
+| **服务端** | 用 pm2 / systemd 常驻 `npx tsx packages/server/src/index.ts`；端口用环境变量 `PORT`（默认 8787） |
+| **前端** | `npm run build -w @sanguo/client` → 产物在 `packages/client/dist`，交给 Nginx / CDN |
+| **前端连哪台服务器** | 复制 `packages/client/.env.example` 为 `.env.production`，设 `VITE_WS_URL=wss://your.domain/ws`（不设则默认 `ws://<当前域名>:8787`） |
+| **WebSocket 反代（Nginx）** | 见下 |
+
+```nginx
+location /ws {
+  proxy_pass http://127.0.0.1:8787;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+}
+```
+
+> 服务器是**内存态房间制**：单进程即可跑。若要横向扩展，需按 roomId 把连接路由到固定实例（一致性哈希）。
+> 录像目前只在内存保留最近一局；`Room.replay()` 返回纯 JSON，可定期落盘做持久化。
+
 ## 武将技能
 
 | 武将 | 阵营 | 技能 | 效果 | 触发点 |

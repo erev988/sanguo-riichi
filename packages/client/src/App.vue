@@ -476,7 +476,11 @@ function connect(): void {
     status.value = `连接断开，${Math.round(delayMs / 1000)}s 后重连（第 ${attempt} 次）…`;
   };
   net.onMsg = handleMsg;
-  net.connect(`ws://${location.hostname || 'localhost'}:8787`);
+  // 生产环境可用 VITE_WS_URL 指定（如 wss://your.domain/ws）；开发默认连本机 8787
+  const wsUrl =
+    (import.meta.env.VITE_WS_URL as string | undefined) ??
+    `ws://${location.hostname || 'localhost'}:8787`;
+  net.connect(wsUrl);
   status.value = '连接中…';
 }
 
