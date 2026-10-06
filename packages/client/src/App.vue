@@ -190,9 +190,9 @@ function pushToast(text: string, ms = 5000): void {
   }, ms);
 }
 
-/** 手牌牌高：**固定按 14 张计算**（不随实际张数变化），避免摸打时整条牌缩放跳动 */
+/** 手牌牌高：**固定按 14 张计算**（不随实际张数变化），并为副露/倒计时预留宽度 */
 const handTileSize = computed(() => {
-  const byWidth = Math.floor((vw.value - 56) / 14);
+  const byWidth = Math.floor((vw.value - 240) / 14); // 预留约 240px 给副露与倒计时
   const byHeight = Math.floor(vh.value * 0.125);
   return Math.max(22, Math.min(48, byWidth, byHeight));
 });
@@ -1041,20 +1041,7 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <!-- 右下角：自己的吃/碰/杠（固定位置，不占手牌空间） -->
-        <div v-if="shown.melds[seats.self].length > 0" class="self-melds">
-          <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
-            <TileSprite
-              v-for="(t, j) in m.tiles"
-              :key="j"
-              :tile="t"
-              :rotated="isCalled(m, j)"
-              :size="22"
-            />
-          </span>
-        </div>
-
-        <!-- 自己：透明浮层（按钮 + 手牌），不挤占牌桌空间 -->
+        <!-- 上层：自己的手牌层（副露 + 手牌 + 倒计时，与下方牌河分层） -->
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
           <div v-if="!replayActive" class="controls">
             <button
@@ -1074,21 +1061,34 @@ onBeforeUnmount(() => {
               {{ optionLabel(a) }}
             </button>
           </div>
-          <div class="row hand">
-            <TileSprite
-              v-for="(t, i) in handCore"
-              :key="i"
-              :tile="t"
-              :size="handTileSize"
-              @click="discardTile(t)"
-            />
-            <TileSprite
-              v-if="shown.lastDrawn != null"
-              class="just-drawn"
-              :tile="shown.lastDrawn"
-              :size="handTileSize"
-              @click="discardTile(shown.lastDrawn)"
-            />
+          <div class="hand-layer">
+            <span v-if="shown.melds[seats.self].length > 0" class="hand-melds">
+              <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
+                <TileSprite
+                  v-for="(t, j) in m.tiles"
+                  :key="j"
+                  :tile="t"
+                  :rotated="isCalled(m, j)"
+                  :size="24"
+                />
+              </span>
+            </span>
+            <span class="hand-tiles">
+              <TileSprite
+                v-for="(t, i) in handCore"
+                :key="i"
+                :tile="t"
+                :size="handTileSize"
+                @click="discardTile(t)"
+              />
+              <TileSprite
+                v-if="shown.lastDrawn != null"
+                class="just-drawn"
+                :tile="shown.lastDrawn"
+                :size="handTileSize"
+                @click="discardTile(shown.lastDrawn)"
+              />
+            </span>
             <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
               {{ remainSec }}s
             </span>
