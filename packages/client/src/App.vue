@@ -495,6 +495,11 @@ function handleMsg(msg: ServerMsg): void {
     case 'rooms':
       rooms.value = msg.rooms;
       break;
+    case 'matching':
+      matching.value = msg.waiting;
+      status.value =
+        msg.waiting >= 4 ? '匹配成功，进入对局…' : `正在匹配…（${msg.waiting}/4 名真人）`;
+      break;
     case 'replay':
       if (msg.replay) loadReplay(msg.replay);
       else pushLog('（本房暂无录像）');
@@ -706,7 +711,25 @@ function pickRoom(r: { id: string; locked: boolean; started: boolean }): void {
   joinById(r.id, '');
 }
 
-/** 刷新房间列表（需要已连接） */
+/** 正在匹配：等待的真人数量（0 = 未在匹配） */
+const matching = ref(0);
+
+function startMatch(): void {
+  if (!connected.value) {
+    status.value = '请先点「连接」';
+    return;
+  }
+  net.send({ t: 'match', name: name.value, generalId: generalId.value });
+  status.value = '正在匹配…';
+}
+
+function cancelMatch(): void {
+  net.send({ t: 'cancelMatch' });
+  matching.value = 0;
+  status.value = '已取消匹配';
+}
+
+/** 查询房间列表（需要已连接） */
 function refreshRooms(): void {
   if (!connected.value) {
     status.value = '请先点「连接」';
@@ -852,6 +875,15 @@ onBeforeUnmount(() => {
     <!-- 已连接但未入座：房间大厅 -->
     <template v-else-if="mySeat === null">
       <div class="lobby">
+        <p class="lobby-head">
+          快速匹配（仅真人 · 不补 AI）
+          <template v-if="matching > 0">
+            <span class="matching">匹配中… {{ matching }}/4</span>
+            <button class="mini" @click="cancelMatch">取消匹配</button>
+          </template>
+          <button v-else class="join" @click="startMatch">快速匹配</button>
+        </p>
+
         <p class="lobby-head">
           房间大厅（{{ rooms.length }}）
           <button class="mini" @click="refreshRooms">刷新</button>

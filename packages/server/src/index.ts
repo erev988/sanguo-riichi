@@ -10,6 +10,71 @@ const PORT = Number(process.env.PORT ?? 8787);
 const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
 const rooms = new Map<string, Room>();
 
+// ---------- 真人匹配队列（仅真人，不补 AI；凑满 4 人自动开局） ----------
+interface Waiting {
+  ws: WebSocket;
+  name: string;
+  generalId: string;
+}
+const matchQueue: Waiting[] = [];
+
+function broadcastMatching(): void {
+  const payload = JSON.stringify({ t: 'matching', waiting: matchQueue.length });
+  for (const w of matchQueue) {
+    try {
+      w.ws.send(payload);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function dequeueMatch(ws: WebSocket): void {
+  const i = matchQueue.findIndex((w) => w.ws === ws);
+  if (i >= 0) matchQueue.splice(i, 1);
+  // 回执：该连接已出队，但仍需知道当前队列状态（客户端据此恢复按钮）
+  try {
+    ws.send(JSON.stringify({ t: 'matching', waiting: matchQueue.length }));
+  } catch {
+    /* ignore */
+  }
+  broadcastMatching();
+}
+
+function enqueueMatch(ws: WebSocket, name: string, generalId: string): void {
+  if (!matchQueue.some((w) => w.ws === ws)) matchQueue.push({ ws, name, generalId });
+  broadcastMatching();
+  tryMatch();
+}
+
+function tryMatch(): void {
+  while (matchQueue.length >= 4) {
+    const group = matchQueue.splice(0, 4);
+    const roomId = `match-${Date.now().toString(36)}`;
+    const room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
+    rooms.set(roomId, room);
+    group.forEach((w) => {
+      try {
+        // 第 4 个人入座即触发开局（4 名真人，不补 AI）
+        const { seat, started } = room.join(w.ws, w.name, w.generalId);
+        w.ws.send(
+          JSON.stringify({
+            t: 'welcome',
+            roomId,
+            seat,
+            started,
+            protocolVersion: PROTOCOL_VERSION,
+            rules: room.rules,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
+    });
+  }
+  broadcastMatching();
+}
+
 wss.on('connection', (ws: WebSocket) => {
   ws.on('message', (raw) => {
     try {
@@ -21,8 +86,7 @@ wss.on('connection', (ws: WebSocket) => {
       }
       const msg = parsed.data;
 
-      if (msg.t === 'join') {
-        const { roomId, name, generalId, rules, token, password } = msg.payload;
+      if (msg.t === 'join') {        const { roomId, name, generalId, rules, token, password } = msg.payload;
         let room = rooms.get(roomId);
         if (!room) {
           room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
@@ -67,6 +131,10 @@ wss.on('connection', (ws: WebSocket) => {
         );
       } else if (msg.t === 'rooms') {
         ws.send(JSON.stringify({ t: 'rooms', rooms: [...rooms.values()].map((r) => r.info()) }));
+      } else if (msg.t === 'match') {
+        enqueueMatch(ws, (msg as { name: string }).name, (msg as { generalId: string }).generalId);
+      } else if (msg.t === 'cancelMatch') {
+        dequeueMatch(ws);
       } else if (msg.t === 'ping') {
         ws.send(JSON.stringify({ t: 'pong' }));
       } else {
@@ -80,6 +148,7 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   ws.on('close', () => {
+    dequeueMatch(ws); // 匹配中断线 → 出队
     for (const room of rooms.values()) room.disconnect(ws);
   });
 });

@@ -146,6 +146,11 @@ export class Room {
     return true;
   }
 
+  /** 匹配成功后由服务器直接开局（无需房主点击） */
+  startNow(): void {
+    if (!this.started) this.startInternal();
+  }
+
   /** 未开局时更换武将（入座后在大厅选将） */
   setGeneral(seat: number, generalId: string): boolean {
     if (this.started) return false;

@@ -85,6 +85,14 @@ export const ClientMsgSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('addAI') }),
   /** 未开局时更换武将（入座后在大厅选将） */
   z.object({ t: z.literal('pickGeneral'), generalId: z.string().max(32) }),
+  /** 快速匹配（仅真人，凑满 4 人自动开局，不补 AI） */
+  z.object({
+    t: z.literal('match'),
+    name: z.string().min(1).max(16),
+    generalId: z.string().max(32),
+  }),
+  /** 取消匹配 */
+  z.object({ t: z.literal('cancelMatch') }),
   /** 查询房间列表 */
   z.object({ t: z.literal('rooms') }),
   /** 获取本房最近一局回放 */
@@ -128,6 +136,8 @@ export type ServerMsg =
   /** 房间成员状态（供大厅显示人数/AI 数、开始按钮） */
   | { t: 'room'; members: RoomMemberInfo[]; hostSeat: number; started: boolean }
   | { t: 'rooms'; rooms: RoomInfo[] }
+  /** 匹配中（尚未凑满 4 名真人） */
+  | { t: 'matching'; waiting: number }
   | { t: 'replay'; replay: ReplayData | null }
   | { t: 'events'; effects: GameEffect[]; revision: number }
   | { t: 'snapshot'; state: GameState }
