@@ -1621,3 +1621,25 @@ button.riichi.active {
   letter-spacing: 0.1em;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- 修正：手牌层必须可点击（此前只有旧容器恢复了点击） ---------- */
+.seat.self .hand-layer {
+  pointer-events: auto;
+}
+
+/* 摸到的牌：与手牌拉开一格，便于区分 */
+.hand-tiles .just-drawn {
+  margin-left: 18px;
+}
+
+/* 手牌本身：可点击、悬停抬牌 */
+.hand-tiles .tile {
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform 0.12s ease, filter 0.12s;
+}
+
+.hand-tiles .tile:hover {
+  transform: translateY(-7px);
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.5));
+}

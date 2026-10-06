@@ -56,6 +56,8 @@ export class Room {
   private aiTimer?: ReturnType<typeof setTimeout>;
   private drawTimer?: ReturnType<typeof setTimeout>;
   private thinkTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  /** 各座位当前决策点的计时截止时间（用于防止点击按钮重置计时） */
+  private thinkDeadline = new Map<number, number>();
   private ronTimer?: ReturnType<typeof setTimeout>;
   private nextTimer?: ReturnType<typeof setTimeout>;
   private started = false;
@@ -278,13 +280,19 @@ export class Room {
     );
   }
 
-  /** 思考时限：25 秒基本 + 10 秒补时；超时自动动作（打牌 / 过） */
+  /** 思考时限：25 秒基本 + 10 秒补时；同一决策点内不因点击而重置（防刷时间） */
   private startThinkTimer(seat: number): void {
+    const now = Date.now();
+    const existing = this.thinkDeadline.get(seat);
+    if (existing != null && existing > now) return; // 该决策点已在计时 → 保持剩余时间
     this.clearThinkTimer(seat);
     const TOTAL = 35_000; // 25s + 10s
+    const deadline = now + TOTAL;
+    this.thinkDeadline.set(seat, deadline);
     this.sendTo(seat, { type: 'timer', seat, ms: TOTAL, total: TOTAL, targetSeat: seat });
     const t = setTimeout(() => {
       this.thinkTimers.delete(seat);
+      this.thinkDeadline.delete(seat);
       if (!this.state || this.state.phase !== 'playing') return;
       const st = this.state;
       if (st.lastDiscard || st.pendingKakan) {
@@ -302,11 +310,13 @@ export class Room {
     if (seat == null) {
       for (const t of this.thinkTimers.values()) clearTimeout(t);
       this.thinkTimers.clear();
+      this.thinkDeadline.clear();
       return;
     }
     const t = this.thinkTimers.get(seat);
     if (t) clearTimeout(t);
     this.thinkTimers.delete(seat);
+    this.thinkDeadline.delete(seat);
   }
 
   /** 给每位真人单播其当前可执行动作（AI 不需要）；需要决策的座位起思考计时 */
