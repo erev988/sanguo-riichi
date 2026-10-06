@@ -138,7 +138,7 @@ export class Room {
     return true;
   }
 
-  /** 房主：添加一个 AI 占位 */
+  /** 房主：添加一个 AI 占位（武将随机） */
   addAI(bySeat: number): boolean {
     if (this.started || bySeat !== this.hostSeat) return false;
     const seat = this.firstFreeSeat();
@@ -146,7 +146,7 @@ export class Room {
     this.members.set(seat, {
       seat,
       name: `AI-${seat + 1}`,
-      generalId: ALL_GENERALS[seat % ALL_GENERALS.length].id,
+      generalId: ALL_GENERALS[Math.floor(Math.random() * ALL_GENERALS.length)].id,
       isAI: true,
     });
     this.broadcastRoom();
@@ -356,13 +356,13 @@ export class Room {
   private startInternal(): void {
     if (this.started) return;
     this.started = true;
-    // 补 AI 位
+    // 补 AI 位（武将随机分配）
     for (let seat = 0; seat < 4; seat++) {
       if (!this.members.has(seat)) {
         this.members.set(seat, {
           seat,
           name: `AI-${seat + 1}`,
-          generalId: ALL_GENERALS[seat % ALL_GENERALS.length].id,
+          generalId: ALL_GENERALS[Math.floor(Math.random() * ALL_GENERALS.length)].id,
           isAI: true,
         });
       }

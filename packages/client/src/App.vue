@@ -184,6 +184,20 @@ function memberName(seat: number, face = 'P'): string {
   return `${face}${seat + 1}`;
 }
 
+/** 该座位的武将名（武将公开） */
+function generalNameOf(seat: number): string {
+  const m = roomMembers.value.find((x) => x.seat === seat);
+  if (!m) return '';
+  return ALL_GENERALS.find((g) => g.id === m.generalId)?.name ?? '';
+}
+
+/** 该座位武将的技能名 */
+function skillNameOf(seat: number): string {
+  const m = roomMembers.value.find((x) => x.seat === seat);
+  if (!m) return '';
+  return ALL_GENERALS.find((g) => g.id === m.generalId)?.skills[0]?.name ?? '';
+}
+
 function pushLog(msg: string): void {
   logs.value.unshift(msg);
   if (logs.value.length > 200) logs.value.pop();
@@ -715,7 +729,7 @@ onBeforeUnmount(() => {
         <p>入座情况（{{ roomMembers.filter((m) => !m.isAI).length }} 真人 + {{ roomMembers.filter((m) => m.isAI).length }} AI）</p>
         <p class="members">
           <span v-for="m in roomMembers" :key="m.seat" :class="{ me: m.seat === mySeat }">
-            {{ m.seat + 1 }}位 {{ m.name }}{{ m.isAI ? '（AI）' : '' }}
+            {{ m.seat + 1 }}位 {{ m.name }}{{ m.isAI ? '（AI）' : '' }} · {{ generalNameOf(m.seat) }}「{{ skillNameOf(m.seat) }}」
           </span>
         </p>
         <div v-if="isHost" class="controls">
@@ -728,7 +742,7 @@ onBeforeUnmount(() => {
       <div v-else class="table">
         <section class="seat top" :class="{ turn: shown.current === seats.top }">
           <header>
-            <span class="who"><em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<span v-if="shown.riichi[seats.top]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<em class="general">「{{ generalNameOf(seats.top) }}·{{ skillNameOf(seats.top) }}」</em><span v-if="shown.riichi[seats.top]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.top] }}</span>
           </header>
           <div class="row backs">
@@ -743,7 +757,7 @@ onBeforeUnmount(() => {
 
         <section class="seat left" :class="{ turn: shown.current === seats.left }">
           <header>
-            <span class="who"><em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<span v-if="shown.riichi[seats.left]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<em class="general">「{{ generalNameOf(seats.left) }}·{{ skillNameOf(seats.left) }}」</em><span v-if="shown.riichi[seats.left]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.left] }}</span>
           </header>
           <div class="row backs">
@@ -818,7 +832,7 @@ onBeforeUnmount(() => {
 
         <section class="seat right" :class="{ turn: shown.current === seats.right }">
           <header>
-            <span class="who"><em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<span v-if="shown.riichi[seats.right]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<em class="general">「{{ generalNameOf(seats.right) }}·{{ skillNameOf(seats.right) }}」</em><span v-if="shown.riichi[seats.right]" class="riichi"> 立直</span></span>
             <span class="score">{{ shown.scores[seats.right] }}</span>
           </header>
           <div class="row backs">
@@ -833,7 +847,7 @@ onBeforeUnmount(() => {
 
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
           <header>
-            <span class="who"><em class="wind">{{ windOf(seats.self) }}</em>你 · {{ currentGeneral?.name }}<span v-if="shown.riichi[seats.self]" class="riichi"> 立直</span></span>
+            <span class="who"><em class="wind">{{ windOf(seats.self) }}</em>你 · {{ currentGeneral?.name }}<em class="general">「{{ currentGeneral?.skills[0]?.name }}」</em><span v-if="shown.riichi[seats.self]" class="riichi"> 立直</span></span>
             <span class="score">
               <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
                 {{ remainSec }}s{{ inExtraTime ? '（补时）' : '' }}

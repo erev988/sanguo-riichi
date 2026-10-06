@@ -422,6 +422,13 @@ button.ron:hover {
 }
 
 /* 座位风位标记 */
+.seat header .who em.general {
+  font-style: normal;
+  color: var(--paper-dim);
+  font-size: 10.5px;
+  margin-left: 4px;
+}
+
 .seat header .who em.wind {
   font-style: normal;
   color: var(--brass);
