@@ -585,7 +585,8 @@ function applyAgaruSkills(
     const df = win.fu - beforeFu;
     if (dh !== 0 || df !== 0) skillLog.push({ skill: sk.name, han: dh, fu: df });
   }
-  if (win.han < 0) win.han = 0; // 技能减番下限为 0（可配置）
+  // 技能减番下限为 1 番：日麻和牌至少 1 番，技能不应把和牌"扣没"
+  if (win.han < 1) win.han = 1;
   return { payments, skillLog };
 }
 

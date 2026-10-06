@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, step } from '../src/engine';
-import { jianying, renjie, wusheng } from '../src/skills';
+import { baolian, jianying, renjie, wusheng } from '../src/skills';
 import { dummyState, noSkills } from './helpers';
 
 function skillsOf(seat: number) {
@@ -112,6 +112,21 @@ describe('和牌事件携带技能数值（供结算面板显示）', () => {
     const agaru = r.effects.find((e) => e.type === 'agaru');
     if (agaru?.type !== 'agaru') throw new Error('未和牌');
     expect(agaru.skills).toEqual([{ skill: '武圣', han: 3, fu: 0 }]);
+  });
+
+  it('技能减番有下限 1 番（暴敛 -2 番不会把和牌扣成 0 番）', () => {
+    const s = dummyState();
+    s.turnCount = 20;
+    s.awaiting = 'discard';
+    // 立直（1 番）+ 门清自摸（1 番）= 2 番；暴敛 >12 张 -2 → 本会变 0，应钳制为 1
+    // 手牌：123m 456p 567s 南南南 中中（无断幺/三色/平和/役牌）
+    s.players[0].log.riichi = true;
+    s.players[0].log.discards = 14;
+    s.players[0].hand = [1, 2, 3, 14, 15, 16, 25, 26, 27, 32, 32, 32, 33, 33];
+    const r = step(s, { type: 'tsumo' }, { skillsOf: (seat: number) => (seat === 0 ? [baolian] : []) });
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    expect(agaru.han).toBe(1); // 下限 1 番，绝不是 0
   });
 
   it('无技能时不产生技能记录', () => {

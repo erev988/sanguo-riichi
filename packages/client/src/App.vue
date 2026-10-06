@@ -402,7 +402,7 @@ function handleEffect(e: GameEffect): void {
         title: `${memberName(e.winner)} ${e.kind === 'tsumo' ? '自摸' : '荣和'}`,
         detail: `${e.han} 番 ${e.fu} 符`,
         yaku: e.yaku,
-        payments: e.payments.filter((p) => p.from >= 0 && p.to >= 0),
+        payments: e.payments.filter((p) => p.to >= 0),
         delta,
         skills: [...skillBuffer],
         skillDetails: e.skills ?? [],
@@ -432,7 +432,7 @@ function handleEffect(e: GameEffect): void {
         title: kindNames[e.kind ?? 'howanpai'] ?? '流局',
         detail: '',
         yaku: [],
-        payments: e.payments.filter((p) => p.from >= 0 && p.to >= 0),
+        payments: e.payments.filter((p) => p.to >= 0),
         delta,
         skills: [...skillBuffer],
         skillDetails: [],
@@ -1122,7 +1122,7 @@ onBeforeUnmount(() => {
 
           <table v-if="result.payments.length" class="pay-table">
             <tr v-for="(p, i) in result.payments" :key="i">
-              <td>{{ memberName(p.from) }} → {{ memberName(p.to) }}</td>
+              <td>{{ p.from >= 0 ? memberName(p.from) + " → " + memberName(p.to) : "立直棒 → " + memberName(p.to) }}</td>
               <td class="num">{{ p.amount }}</td>
             </tr>
           </table>
