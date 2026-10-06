@@ -13,6 +13,7 @@ function agaruCtx(over: Partial<AgaruContext> = {}): AgaruContext {
     discards: 0,
     discardTiles: [],
     payments: [],
+    skillLog: [],
     ...over,
   };
 }

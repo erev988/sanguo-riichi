@@ -101,6 +101,31 @@ describe('引擎：流局 + 技能三', () => {
   });
 });
 
+describe('和牌事件携带技能数值（供结算面板显示）', () => {
+  it('关羽武圣：万面子 ×3 → 和牌事件里记录 +3 番', () => {
+    const s = dummyState();
+    s.turnCount = 10;
+    s.awaiting = 'discard';
+    // 123m 456m 789m 456p 白白 → 3 个万面子
+    s.players[0].hand = [1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16, 35, 35];
+    const r = step(s, { type: 'tsumo' }, { skillsOf: (seat: number) => (seat === 0 ? [wusheng] : []) });
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    expect(agaru.skills).toEqual([{ skill: '武圣', han: 3, fu: 0 }]);
+  });
+
+  it('无技能时不产生技能记录', () => {
+    const s = dummyState();
+    s.turnCount = 10;
+    s.awaiting = 'discard';
+    s.players[0].hand = [1, 2, 3, 14, 15, 16, 24, 25, 26, 36, 36, 36, 35, 35];
+    const r = step(s, { type: 'tsumo' }, { skillsOf: () => [] });
+    const agaru = r.effects.find((e) => e.type === 'agaru');
+    if (agaru?.type !== 'agaru') throw new Error('未和牌');
+    expect(agaru.skills).toEqual([]);
+  });
+});
+
 describe('引擎：飞人规则（雀魂）', () => {
   it('有人点数为负立即终局，reason = tobi', () => {
     const s = dummyState();

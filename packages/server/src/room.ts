@@ -460,28 +460,39 @@ export class Room {
     }
   }
 
-  /** 响应窗口：AI 抢先荣和，否则延迟关闭窗口（有真人可和时等更久，给玩家操作时间） */
+  /** 响应窗口：AI 抢先荣和；真人若可"实质动作"则等其思考时限（35s），否则短暂延时关闭 */
   private scheduleResponse(): void {
     clearTimeout(this.ronTimer);
     if (!this.state) return;
-    const src = this.state.pendingKakan ?? this.state.lastDiscard;
+    const st = this.state;
+    const src = st.pendingKakan ?? st.lastDiscard;
     if (!src) return;
-    let humanCanRon = false;
+
+    let humanCanAct = false;
     for (const [seat, m] of this.members) {
-      const ok = canRon(this.state, seat, src.tile, src.player).ok;
-      if (!ok) continue;
       if (m.isAI) {
-        this.act(seat, { type: 'ron', player: seat, tile: src.tile, from: src.player });
-        return;
+        if (canRon(st, seat, src.tile, src.player).ok) {
+          this.act(seat, { type: 'ron', player: seat, tile: src.tile, from: src.player });
+          return; // AI 抢和
+        }
+        continue;
       }
-      humanCanRon = true;
+      // 真人：是否有"实质动作"（吃/碰/杠/荣和）——有则等满思考时限（按钮一直可点）
+      const real = legalActions(st).some((a) => {
+        const p = (a as { player?: number }).player;
+        if (p !== seat) return false;
+        return a.type === 'chii' || a.type === 'pon' || a.type === 'kan' || a.type === 'ron';
+      });
+      if (real) humanCanAct = true;
     }
-    const delay = humanCanRon ? 5000 : 400; // 真人可和：留 5 秒操作时间
-    const passSeat = this.state.current;
+    if (humanCanAct) return; // 交给 thinkTimer（超时自动"过"）
+
+    // 无人可动作（只能过）→ 短暂延时后关闭窗口，避免每手都等 35 秒
+    const passSeat = st.current;
     this.ronTimer = setTimeout(() => {
       if (!this.state) return;
       if (this.state.lastDiscard || this.state.pendingKakan) this.act(passSeat, { type: 'pass' });
-    }, delay);
+    }, 400);
   }
 
   /** 一局结束后自动开新局（连庄/进庄）；整场结束则不动作 */

@@ -108,6 +108,8 @@ interface ResultInfo {
   payments: { from: number; to: number; amount: number }[];
   delta: number[];
   skills: string[];
+  /** 和牌时各技能的数值影响 */
+  skillDetails: { skill: string; han: number; fu: number }[];
   tenpai?: boolean[];
   yakuman: boolean;
 }
@@ -173,10 +175,24 @@ const handCore = computed(() => {
   return [...body].sort((a, b) => norm(a) - norm(b));
 });
 
-/** 手牌牌高：同时受视口宽/高约束，保证 13/14 张一整条且不撑破牌桌 */
+/** 顶部提示条（技能触发等），5 秒后自动消失 */
+interface Toast {
+  id: number;
+  text: string;
+}
+const toasts = ref<Toast[]>([]);
+let toastSeq = 0;
+function pushToast(text: string, ms = 5000): void {
+  const id = ++toastSeq;
+  toasts.value = [...toasts.value, { id, text }];
+  setTimeout(() => {
+    toasts.value = toasts.value.filter((t) => t.id !== id);
+  }, ms);
+}
+
+/** 手牌牌高：**固定按 14 张计算**（不随实际张数变化），避免摸打时整条牌缩放跳动 */
 const handTileSize = computed(() => {
-  const n = (handCore.value.length ?? 13) + 1;
-  const byWidth = Math.floor((vw.value - 56) / Math.max(13, n));
+  const byWidth = Math.floor((vw.value - 56) / 14);
   const byHeight = Math.floor(vh.value * 0.125);
   return Math.max(22, Math.min(48, byWidth, byHeight));
 });
@@ -364,9 +380,12 @@ function handleEffect(e: GameEffect): void {
         pendingDiscard.value = { player: e.player, tile: e.tile, chankan: true };
       }
       break;
-    case 'skill-pay':
+    case 'skill-pay': {
+      const line = describe(e, memberName);
+      if (line) pushToast(line); // 顶部提示，5 秒后自动消失
       if (!skillBuffer.includes(e.skill)) skillBuffer.push(e.skill);
       break;
+    }
     case 'passed':
       pendingDiscard.value = null;
       break;
@@ -386,8 +405,13 @@ function handleEffect(e: GameEffect): void {
         payments: e.payments.filter((p) => p.from >= 0 && p.to >= 0),
         delta,
         skills: [...skillBuffer],
+        skillDetails: e.skills ?? [],
         yakuman,
       };
+      // 和牌技能也在顶部提示一次
+      for (const sd of e.skills ?? []) {
+        pushToast(`【${sd.skill}】${memberName(e.winner)} ${sd.han > 0 ? '+' : ''}${sd.han} 番`);
+      }
       animateDelta(delta);
       pendingDiscard.value = null;
       skillBuffer = [];
@@ -411,6 +435,7 @@ function handleEffect(e: GameEffect): void {
         payments: e.payments.filter((p) => p.from >= 0 && p.to >= 0),
         delta,
         skills: [...skillBuffer],
+        skillDetails: [],
         tenpai: e.tenpai,
         yakuman: false,
       };
@@ -786,6 +811,10 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app">
+    <!-- 顶部提示：技能触发等，5 秒后自动消失 -->
+    <div class="toasts">
+      <span v-for="t in toasts" :key="t.id" class="toast">{{ t.text }}</span>
+    </div>
     <h1>三国麻雀</h1>
 
     <!-- 未连接 -->
@@ -885,7 +914,7 @@ onBeforeUnmount(() => {
             <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
           </div>
           <div class="seat-tag">
-            <em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<span
+            <em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<em class="gen">{{ generalNameOf(seats.top) }}</em><span
               v-if="shown.riichi[seats.top]"
               class="riichi"
             >
@@ -910,7 +939,7 @@ onBeforeUnmount(() => {
               <i v-for="i in shown.handCounts[seats.left]" :key="i" class="back-v" />
             </span>
             <span class="seat-tag v-tag">
-              <em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<span
+              <em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<em class="gen">{{ generalNameOf(seats.left) }}</em><span
                 v-if="shown.riichi[seats.left]"
                 class="riichi"
               >
@@ -990,7 +1019,7 @@ onBeforeUnmount(() => {
         <section class="seat right" :class="{ turn: shown.current === seats.right }">
           <div class="v-stack">
             <span class="seat-tag v-tag">
-              <em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<span
+              <em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<em class="gen">{{ generalNameOf(seats.right) }}</em><span
                 v-if="shown.riichi[seats.right]"
                 class="riichi"
               >
@@ -1104,7 +1133,18 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
-          <div v-if="result.skills.length" class="skills-line">技能：{{ result.skills.join('、') }}</div>
+          <div v-if="result.skillDetails.length || result.skills.length" class="skills-line">
+            技能：
+            <span v-if="result.skillDetails.length" class="skill-detail">
+              <span v-for="(sd, i) in result.skillDetails" :key="i" class="skill-chip">
+                {{ sd.skill }} <b>{{ sd.han > 0 ? '+' : '' }}{{ sd.han }} 番</b>
+                <template v-if="sd.fu !== 0">
+                  <b>{{ sd.fu > 0 ? '+' : '' }}{{ sd.fu }} 符</b>
+                </template>
+              </span>
+            </span>
+            <span v-else>{{ result.skills.join('、') }}</span>
+          </div>
         </div>
         <button class="scroll-btn" @click="result = null">收 卷</button>
       </div>

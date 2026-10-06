@@ -25,6 +25,8 @@ export interface AgaruContext extends SkillContext {
   discardTiles: Tile[];
   /** 技能可追加点棒转移（如先制立直和牌 +1000/家） */
   payments: Payment[];
+  /** 技能结算记录：某技能改了多少番/符（供结算面板展示） */
+  skillLog: { skill: string; han: number; fu: number }[];
 }
 
 /** 荒牌流局结算钩子上下文 */

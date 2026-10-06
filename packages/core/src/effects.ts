@@ -49,6 +49,8 @@ export type GameEffect =
       fu: number;
       yaku: string[];
       payments: Payment[];
+      /** 本局和牌时各技能的影响（改了多少番/符） */
+      skills?: { skill: string; han: number; fu: number }[];
     }
   | { type: 'ryukyoku'; tenpai: boolean[]; payments: Payment[]; kind?: 'howanpai' | 'kyuushu' | 'suufon' | 'suukantsu' | 'suuchariichi' }
   | { type: 'gameEnded'; scores: number[]; reason: 'normal' | 'tobi' | 'ryukyoku' };

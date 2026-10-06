@@ -299,7 +299,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const agariPai = hand[hand.length - 1]; // 摸牌在末尾
       const win = (opts.calcWin ?? winFromState)(s, winner, 'tsumo', agariPai);
       if (!win) return fail('无役，不能自摸');
-      const skillPayments = applyAgaruSkills(s, opts, winner, win);
+      const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win);
       const otherPayments: Payment[] = [];
       applyOtherAgaruSkills(s, opts, winner, otherPayments); // 他人和牌钩子（妄尊）
       const payments = [
@@ -314,7 +314,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       applyPayments(s, payments, opts);
       s.riichiSticks = 0;
       s.lastResult = { winners: [winner], tenpai: s.players.map((p) => p.log.tenpai) };
-      effects.push({ type: 'agaru', winner, kind: 'tsumo', han: win.han, fu: win.fu, yaku: win.yaku, payments });
+      effects.push({ type: 'agaru', winner, kind: 'tsumo', han: win.han, fu: win.fu, yaku: win.yaku, payments, skills: skillLog });
       effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
       finish(s, effects, 'normal');
       break;
@@ -332,7 +332,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (!fromDiscard && !fromKakan) return fail('没有可荣和的牌');
       const win = (opts.calcWin ?? winFromState)(s, winner, 'ron', action.tile, !!fromKakan);
       if (!win) return fail('无役，不能荣和');
-      const skillPayments = applyAgaruSkills(s, opts, winner, win);
+      const { payments: skillPayments, skillLog } = applyAgaruSkills(s, opts, winner, win);
       const otherPayments: Payment[] = [];
       applyOtherAgaruSkills(s, opts, winner, otherPayments); // 他人和牌钩子（妄尊）
       const first = s.agariThisTurn.length === 0; // 頭跳ね：仅第一家和牌者得立直棒/本场
@@ -349,7 +349,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (first) s.riichiSticks = 0;
       s.agariThisTurn.push(winner);
       clearIppatsu(s);
-      effects.push({ type: 'agaru', winner, kind: 'ron', han: win.han, fu: win.fu, yaku: win.yaku, payments });
+      effects.push({ type: 'agaru', winner, kind: 'ron', han: win.han, fu: win.fu, yaku: win.yaku, payments, skills: skillLog });
       effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
       // 不立即结束：等待其他家荣和（一炮多响），由 pass 收尾
       break;
@@ -548,7 +548,12 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
 // ---------- 内部结算 ----------
 
 /** 和牌技能钩子：按 priority 依次结算，技能可改 han/fu 或追加点棒转移 */
-function applyAgaruSkills(s: GameState, opts: StepOptions, winner: number, win: WinInfo): Payment[] {
+function applyAgaruSkills(
+  s: GameState,
+  opts: StepOptions,
+  winner: number,
+  win: WinInfo,
+): { payments: Payment[]; skillLog: { skill: string; han: number; fu: number }[] } {
   // 把手牌拆解转成 Meld[]，供技能统计面子（如「武圣」「制衡」）
   const handMelds: Meld[] = (win.decomp?.mentsu ?? []).map((m) =>
     m.kind === 'shuntsu'
@@ -556,6 +561,7 @@ function applyAgaruSkills(s: GameState, opts: StepOptions, winner: number, win: 
       : { type: 'pon' as const, tiles: [m.anchor, m.anchor, m.anchor] },
   );
   const payments: Payment[] = [];
+  const skillLog: { skill: string; han: number; fu: number }[] = [];
   const ctx: AgaruContext = {
     seat: winner,
     state: s,
@@ -566,13 +572,21 @@ function applyAgaruSkills(s: GameState, opts: StepOptions, winner: number, win: 
     // 渐营：判定「连续三张同类」时被鸣走的牌不算（用未被鸣走的弃牌序列）
     discardTiles: [...s.players[winner].discards],
     payments,
+    skillLog,
   };
   const skills = (opts.skillsOf(winner) ?? [])
     .filter((sk) => sk.onAgaru)
     .sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100));
-  for (const sk of skills) sk.onAgaru!(ctx);
+  for (const sk of skills) {
+    const beforeHan = win.han;
+    const beforeFu = win.fu;
+    sk.onAgaru!(ctx);
+    const dh = win.han - beforeHan;
+    const df = win.fu - beforeFu;
+    if (dh !== 0 || df !== 0) skillLog.push({ skill: sk.name, han: dh, fu: df });
+  }
   if (win.han < 0) win.han = 0; // 技能减番下限为 0（可配置）
-  return payments;
+  return { payments, skillLog };
 }
 
 /** 某座位是否拥有满足条件的技能 */

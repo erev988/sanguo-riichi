@@ -1288,3 +1288,97 @@ button.riichi.active {
 .seat.self .controls {
   margin: 0 0 2px;
 }
+
+/* ---------- 顶部提示（技能触发等，5 秒消失） ---------- */
+.toasts {
+  position: fixed;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 4px 14px;
+  border: 1px solid rgba(201, 162, 39, 0.5);
+  border-radius: 3px;
+  background: rgba(11, 10, 8, 0.9);
+  color: var(--brass);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  animation: toast-in 0.18s ease-out;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 座位标签：加武将名 ---------- */
+.seat-tag .gen {
+  font-style: normal;
+  color: #a79c86;
+  margin-left: 5px;
+  font-size: 10.5px;
+}
+
+/* ---------- 抑制布局跳动：给各区域固定高度 ---------- */
+.seat .row.backs {
+  height: 22px;
+  overflow: hidden;
+}
+
+.v-backs {
+  height: 78px;
+  overflow: hidden;
+}
+
+.v-melds {
+  height: 24px;
+  overflow: hidden;
+}
+
+/* 按钮区固定高度：按钮从无到有也不会顶动手牌 */
+.seat.self .controls {
+  height: 30px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.seat.self .row.hand {
+  height: 50px;
+  align-items: flex-end;
+}
+
+/* 中央方块尺寸固定：数字变化不重排 */
+.core {
+  min-width: 190px;
+}
+
+.core-cell {
+  min-width: 76px;
+  display: inline-block;
+}
+
+/* 结算面板：技能数值 chip */
+.skill-chip {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border: 1px solid rgba(164, 53, 44, 0.5);
+  border-radius: 2px;
+  color: #8a2a22;
+  font-size: 12.5px;
+}
