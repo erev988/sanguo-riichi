@@ -330,15 +330,19 @@ export class Room {
     if (!this.state || this.state.phase !== 'playing') return;
     const st = this.state;
     const all = legalActions(st);
+    const discarder = st.lastDiscard?.player ?? st.pendingKakan?.player ?? -1;
+    const hasWindow = !!(st.lastDiscard || st.pendingKakan);
     for (let seat = 0; seat < 4; seat++) {
       const m = this.members.get(seat);
       if (!m || m.isAI) continue;
       const acts = all.filter((a) => {
-        // 打牌由"点手牌"完成、摸牌自动 —— 不下发这两类，只下发需要决策的动作
+        // 打牌由"点手牌"完成、摸牌自动 —— 不下发这两类
         if (a.type === 'discard' || a.type === 'draw') return false;
+        // 「过」属于响应窗口内的所有非打牌者（否则碰/吃的人收不到"过"）
+        if (a.type === 'pass') return hasWindow && seat !== discarder;
         const p = (a as { player?: number }).player;
         if (p != null) return p === seat; // 副露/荣和：声明者自己
-        return seat === st.current; // 自摸/过/九种九牌：当前行动者
+        return seat === st.current; // 自摸/九种九牌：当前行动者
       });
       if (acts.length > 0) {
         m.ws?.send(
@@ -474,6 +478,8 @@ export class Room {
     s.rinshanWall = s.rinshanWall.map(() => -1);
     const m = this.members.get(seat);
     m?.ws?.send(JSON.stringify({ t: 'snapshot', state: s }));
+    // 快照之后补发当前可选项（断线重连/从后台返回时不会错过 options 广播）
+    this.broadcastOptions();
   }
 
   private scheduleAI(): void {

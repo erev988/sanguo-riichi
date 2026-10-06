@@ -52,6 +52,32 @@ describe('默认规则参数', () => {
   });
 });
 
+  it('荒牌流局即便进庄，本场也 +1（雀魂规则）', () => {
+    const s = dummyState();
+    s.phase = 'ended';
+    s.reason = 'ryukyoku';
+    s.round = { wind: 'east', round: 1, honba: 0 };
+    s.dealer = 0;
+    // 庄家不听牌 → 进庄；但流局本场仍 +1
+    s.lastResult = { winners: [], tenpai: [false, true, false, false] };
+    const next = advanceRound(s);
+    expect(next.dealer).toBe(1); // 进庄
+    expect(next.round.round).toBe(2);
+    expect(next.round.honba).toBe(1); // 流局本场 +1
+  });
+
+  it('子家和牌进庄时本场归零', () => {
+    const s = dummyState();
+    s.phase = 'ended';
+    s.reason = 'normal';
+    s.round = { wind: 'east', round: 1, honba: 2 };
+    s.dealer = 0;
+    s.lastResult = { winners: [1], tenpai: [] };
+    const next = advanceRound(s);
+    expect(next.dealer).toBe(1);
+    expect(next.round.honba).toBe(0);
+  });
+
 describe('延长战（返点 40000）', () => {
   function endedAtSouth4(maxScore: number) {
     const s = dummyState();

@@ -850,9 +850,10 @@ export function advanceRound(s: GameState): GameState {
     if (wind === 'west' && (reachedOrigin || rr === 4)) return s;
   }
 
+  // 本场：连庄 +1；荒牌流局即便进庄也 +1（雀魂规则）；其余进庄归 0
   const round: RoundInfo = renchan
     ? { ...s.round, honba: s.round.honba + 1 }
-    : { ...nextRoundInfo(s.round), honba: 0 };
+    : { ...nextRoundInfo(s.round), honba: s.reason === 'ryukyoku' ? s.round.honba + 1 : 0 };
   const nextDealer = renchan ? dealer : (dealer + 1) % 4;
 
   const seats: SeatConfig[] = s.players.map((p) => ({ name: p.name, generalId: p.generalId, isAI: p.isAI }));

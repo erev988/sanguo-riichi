@@ -60,6 +60,8 @@ const riichiDiscardIdx = ref<Record<number, number>>({});
 const currentSeat = ref(-1);
 const roundText = ref('');
 const honbaText = ref('');
+/** 本场数（场供 = 本场 × 300） */
+const honba = ref(0);
 const riichiSticks = ref(0);
 const logs = ref<string[]>([]);
 const ended = ref(false);
@@ -852,6 +854,16 @@ async function enterFullscreenLandscape(): Promise<void> {
   }
 }
 
+/** 从后台返回前台：修复「退到后台一段时间后卡死」 */
+function handleVisibility(): void {
+  if (typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+  if (!connected.value) {
+    connectOnly(); // 断线则重连（凭 token 自动复座）
+    return;
+  }
+  net.send({ t: 'snapshot', seq: ++net.seq }); // 已连接则补拉状态与可选项
+}
+
 function onResize(): void {
   vw.value = window.innerWidth;
   vh.value = window.innerHeight;
@@ -859,13 +871,17 @@ function onResize(): void {
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', handleVisibility);
   tickTimer = setInterval(() => {
     nowTick.value = Date.now();
   }, 250);
 }
 
 onBeforeUnmount(() => {
-  if (typeof window !== 'undefined') window.removeEventListener('resize', onResize);
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', onResize);
+    document.removeEventListener('visibilitychange', handleVisibility);
+  }
   if (tickTimer) clearInterval(tickTimer);
   if (replayTimer) clearInterval(replayTimer);
   net.close();
@@ -978,9 +994,12 @@ onBeforeUnmount(() => {
             <TileSprite v-for="(t, i) in doraIndicators" :key="i" :tile="t" :size="26" />
           </span>
           <span class="corner-sep" />
-          <span class="corner-label">场供</span>
+          <span class="corner-label">供托</span>
           <span class="corner-val">{{ shown.riichiSticks * 1000 }}</span>
-          <span v-if="shown.honbaText" class="corner-val">{{ shown.honbaText }}</span>
+          <span class="corner-sep" />
+          <span class="corner-label">场供</span>
+          <span class="corner-val">{{ honba * 300 }}</span>
+          <span v-if="honba > 0" class="corner-sub">{{ honba }} 本场</span>
         </div>
 
         <!-- 对家：横排，整体居中 -->

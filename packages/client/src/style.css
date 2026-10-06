@@ -1676,3 +1676,22 @@ button.riichi.active {
   padding-left: 8px;
   border-left: 1px dashed rgba(75, 58, 36, 0.35);
 }
+
+/* ---------- 去掉移动端点击高亮、禁用选中/复制 ---------- */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app,
+.modal-mask {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 输入框仍可正常输入与选择 */
+input,
+textarea {
+  user-select: text;
+  -webkit-user-select: text;
+}
