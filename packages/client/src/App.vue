@@ -9,7 +9,7 @@ import {
   type Meld,
   type Tile,
 } from '@sanguo/core';
-import type { RoomInfo, ServerMsg } from '@sanguo/shared';
+import { PROTOCOL_VERSION, type RoomInfo, type ServerMsg } from '@sanguo/shared';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import TileSprite from './components/TileSprite.vue';
 import { Net } from './net';
@@ -503,6 +503,7 @@ function handleEffect(e: GameEffect): void {
       scores.value = e.scores;
       break;
     case 'agaru': {
+      if (typeof e.riichiSticks === 'number') riichiSticks.value = e.riichiSticks;
       const yakuman = e.han >= 13;
       if (yakuman) sfx.yakuman();
       else sfx.win();
@@ -532,6 +533,8 @@ function handleEffect(e: GameEffect): void {
     }
     case 'ryukyoku': {
       sfx.ryukyoku();
+      // ★ 结算后立直棒可能已被收走 → 同步「供托」显示（此前不清零）
+      if (typeof e.riichiSticks === 'number') riichiSticks.value = e.riichiSticks;
       const kindNames: Record<string, string> = {
         kyuushu: '九种九牌',
         suufon: '四风连打',
@@ -567,6 +570,11 @@ function handleEffect(e: GameEffect): void {
 function handleMsg(msg: ServerMsg): void {
   switch (msg.t) {
     case 'welcome':
+      // 协议版本校验（升级提示机制此前是摆设）
+      if (msg.protocolVersion !== PROTOCOL_VERSION) {
+        status.value = '客户端与服务端协议版本不一致，请刷新页面（Ctrl/Cmd+Shift+R）';
+        pushLog(`协议版本不匹配：客户端 ${PROTOCOL_VERSION} / 服务端 ${msg.protocolVersion}`);
+      }
       if (msg.token) {
         token.value = msg.token;
         localStorage.setItem('sanguo-token', msg.token);
@@ -723,7 +731,8 @@ function connectOnly(): void {
     duplicateTab.value = false;
     status.value = '本页接管连接…';
   }
-  void enterFullscreenLandscape(); // 移动端：自动进入全屏并锁横屏
+  // 仅移动端自动进入全屏并锁横屏（桌面点「连接」不该全屏）
+  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) void enterFullscreenLandscape();
   net.onOpen = () => {
     connected.value = true;
     if (joinedRoom) {
@@ -879,6 +888,9 @@ const canRiichiNow = computed(() => {
 
 function discardTile(t: Tile): void {
   if (ended.value) return;
+  // ★ 行动门控：只有轮到自己时点手牌才有效
+  //   （此前非自己回合点击会静默失败，还会误消耗立直宣言模式）
+  if (mySeat.value == null || currentSeat.value !== mySeat.value) return;
   act({ type: 'discard', tile: t, riichi: riichiMode.value });
   riichiMode.value = false;
 }

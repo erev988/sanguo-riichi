@@ -392,10 +392,13 @@ function hasIkkitsuukan(ctx: YakuContext): boolean {
     }
     return false;
   };
-  if (check(ctx.decomp.flatMap((d) => d.mentsu), (m) => m.anchor)) return true;
-  // 副露中的顺子
-  const fuuroShuntsu = ctx.fuuro.filter((f) => f.type === 'chii').map((f) => ({ kind: 'shuntsu' as const, anchor: Math.min(...f.tiles) }));
-  return check(fuuroShuntsu, (m) => m.anchor);
+  // ★ 必须把手牌顺子与副露顺子合并判定：
+  //   此前两者分开 check，导致「副露 123m + 手牌 456m789m」这类混合组成不成立
+  const fuuroShuntsu = ctx.fuuro
+    .filter((f) => f.type === 'chii')
+    .map((f) => ({ kind: 'shuntsu' as const, anchor: Math.min(...f.tiles) }));
+  if (ctx.decomp.some((d) => check([...d.mentsu, ...fuuroShuntsu], (m) => m.anchor))) return true;
+  return check(fuuroShuntsu, (m) => m.anchor); // 副露本身就凑成一气
 }
 
 function hasSanshokuShuntsu(ctx: YakuContext): boolean {

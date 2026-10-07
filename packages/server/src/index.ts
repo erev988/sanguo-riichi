@@ -14,6 +14,9 @@ const wss = new WebSocketServer({
   maxPayload: 64 * 1024, // 限制单帧 64KB（默认 100MB，巨型 JSON 可拖垮进程）
 });
 const rooms = new Map<string, Room>();
+/** 连接 → 房间号绑定：act/snapshot/clientSeed 只在该房间执行
+ *  （此前遍历所有房间调用，同一连接可同时作用于多个房间，pass 会在每个房间关窗） */
+const connRoom = new Map<WebSocket, string>();
 
 // ---------- 真人匹配队列（仅真人，不补 AI；凑满 4 人自动开局） ----------
 interface Waiting {
@@ -62,6 +65,7 @@ function tryMatch(): void {
       try {
         // 第 4 个人入座即触发开局（4 名真人，不补 AI）
         const { seat, started, token } = room.join(w.ws, w.name, w.generalId);
+        connRoom.set(w.ws, roomId);
         w.ws.send(
           JSON.stringify({
             t: 'welcome',
@@ -118,6 +122,7 @@ wss.on('connection', (ws: WebSocket) => {
         }
         try {
           const { seat, started, rejoined, token: newToken } = room.join(ws, name, generalId, rules, token, password);
+          connRoom.set(ws, roomId);
           ws.send(
             JSON.stringify({
               t: 'welcome',
@@ -170,7 +175,9 @@ wss.on('connection', (ws: WebSocket) => {
       } else if (msg.t === 'match') {
         enqueueMatch(ws, (msg as { name: string }).name, (msg as { generalId: string }).generalId);
       } else if (msg.t === 'clientSeed') {
-        for (const room of rooms.values()) room.handleClientSeed(ws, (msg as { seed: string }).seed);
+        const bound = connRoom.get(ws);
+        const r = bound ? rooms.get(bound) : undefined;
+        if (r) r.handleClientSeed(ws, (msg as { seed: string }).seed);
       } else if (msg.t === 'cancelMatch') {
         dequeueMatch(ws);
       } else if (msg.t === 'ping') {
@@ -187,7 +194,11 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('close', () => {
     dequeueMatch(ws); // 匹配中断线 → 出队
-    for (const room of rooms.values()) room.disconnect(ws);
+    const bound = connRoom.get(ws);
+    connRoom.delete(ws);
+    const r = bound ? rooms.get(bound) : undefined;
+    if (r) r.disconnect(ws);
+    else for (const room of rooms.values()) room.disconnect(ws); // 兜底
   });
 });
 

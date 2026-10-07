@@ -56,6 +56,8 @@ export type GameEffect =
       melds?: Meld[];
       /** 和牌张 */
       winTile?: number;
+      /** 结算后场上剩余的立直棒数（客户端「供托」显示用） */
+      riichiSticks?: number;
     }
   | {
       /** 定牌信息公开：局后公布，用于验证牌序未被篡改（provably fair） */
@@ -67,5 +69,5 @@ export type GameEffect =
       /** 最终盐 = sha256(serverSeed : clientSeeds...) */
       salt: string;
     }
-  | { type: 'ryukyoku'; tenpai: boolean[]; payments: Payment[]; kind?: 'howanpai' | 'kyuushu' | 'suufon' | 'suukantsu' | 'suuchariichi' }
+  | { type: 'ryukyoku'; tenpai: boolean[]; payments: Payment[]; kind?: 'howanpai' | 'kyuushu' | 'suufon' | 'suukantsu' | 'suuchariichi'; /** 结算后剩余立直棒数（客户端供托显示用） */ riichiSticks?: number }
   | { type: 'gameEnded'; scores: number[]; reason: 'normal' | 'tobi' | 'ryukyoku' };

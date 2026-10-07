@@ -339,7 +339,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       s.riichiSticks = 0;
       s.lastResult = { winners: [winner], tenpai: s.players.map((p) => p.log.tenpai) };
       effects.push({
-        type: 'agaru', winner, kind: 'tsumo', han: win.han, fu: win.fu, yaku: win.yaku, payments,
+        type: 'agaru', winner, kind: 'tsumo', han: win.han, fu: win.fu, yaku: win.yaku, payments, riichiSticks: s.riichiSticks,
         skills: skillLog,
         hand: [...s.players[winner].hand],
         melds: [...s.players[winner].openMelds],
@@ -394,7 +394,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       s.agariThisTurn.push(winner);
       // ★ 不在此清一发：同一张牌多家荣和时，各家的一发都应成立（收尾时统一清理）
       effects.push({
-        type: 'agaru', winner, kind: 'ron', han: win2.han, fu: win2.fu, yaku: win2.yaku, payments,
+        type: 'agaru', winner, kind: 'ron', han: win2.han, fu: win2.fu, yaku: win2.yaku, payments, riichiSticks: s.riichiSticks,
         skills: skillLog,
         hand: [...s.players[winner].hand, action.tile],
         melds: [...s.players[winner].openMelds],
@@ -826,7 +826,7 @@ function settleRyukyoku(s: GameState, opts: StepOptions, effects: GameEffect[]):
   }
 
   applyPayments(s, payments, opts);
-  effects.push({ type: 'ryukyoku', tenpai, payments, kind: 'howanpai' });
+  effects.push({ type: 'ryukyoku', tenpai, payments, kind: 'howanpai', riichiSticks: s.riichiSticks });
   effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
   finish(s, effects, 'ryukyoku');
   return { state: s, effects };

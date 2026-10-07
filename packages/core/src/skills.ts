@@ -191,7 +191,10 @@ export const baolian: Skill = {
       if (winners.length > 0) {
         ctx.payments.push({ from: me, to: -1, amount: 2000 });
         for (const w of winners) {
-          ctx.payments.push({ from: -1, to: w, amount: Math.floor(2000 / winners.length) });
+          // ★ 余数归第一位（此前 Math.floor(2000/3)=666×3=1998，2 点点棒凭空蒸发）
+          const base = Math.floor(2000 / winners.length);
+          const extra = 2000 - base * winners.length;
+          ctx.payments.push({ from: -1, to: w, amount: base + (w === winners[0] ? extra : 0) });
         }
       }
     }
