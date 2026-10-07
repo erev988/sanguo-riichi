@@ -120,7 +120,7 @@ describe('牌序固定：开局即定，全程不换牌/不重排', () => {
           ? { type: 'discard', tile: hand[hand.length - 1] }
           : (acts.find((a) => a.type === 'pass') ?? null));
       if (!act) break;
-      const r = step(s, act, { skillsOf: (st) => allSkills[st.current] ?? [] });
+      const r = step(s, act, { skillsOf: (seat) => allSkills[seat] ?? [] });
       s = r.state;
       expect(s.wall).toEqual(wall0.slice(0, s.wall.length));
     }

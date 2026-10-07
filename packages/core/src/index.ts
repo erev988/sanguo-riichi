@@ -1,3 +1,4 @@
+export * from './sha256';
 export * from './types';
 export * from './actions';
 export * from './effects';

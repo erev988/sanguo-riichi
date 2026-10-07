@@ -134,6 +134,8 @@ wss.on('connection', (ws: WebSocket) => {
         ws.send(JSON.stringify({ t: 'rooms', rooms: [...rooms.values()].map((r) => r.info()) }));
       } else if (msg.t === 'match') {
         enqueueMatch(ws, (msg as { name: string }).name, (msg as { generalId: string }).generalId);
+      } else if (msg.t === 'clientSeed') {
+        for (const room of rooms.values()) room.handleClientSeed(ws, (msg as { seed: string }).seed);
       } else if (msg.t === 'cancelMatch') {
         dequeueMatch(ws);
       } else if (msg.t === 'ping') {

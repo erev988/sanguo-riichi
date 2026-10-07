@@ -93,6 +93,8 @@ export const ClientMsgSchema = z.discriminatedUnion('t', [
   }),
   /** 取消匹配 */
   z.object({ t: z.literal('cancelMatch') }),
+  /** 玩家为本局贡献的随机数（参与定牌，防止服务器单方面决定牌序） */
+  z.object({ t: z.literal('clientSeed'), seed: z.string().regex(/^[0-9a-f]{8,64}$/i) }),
   /** 查询房间列表 */
   z.object({ t: z.literal('rooms') }),
   /** 获取本房最近一局回放 */
@@ -138,6 +140,8 @@ export type ServerMsg =
   | { t: 'rooms'; rooms: RoomInfo[] }
   /** 匹配中（尚未凑满 4 名真人） */
   | { t: 'matching'; waiting: number }
+  /** 服务器对本局种子（+盐）的承诺哈希：开局前公布，局后可用公开值验证未被篡改 */
+  | { t: 'seedCommit'; commit: string }
   | { t: 'replay'; replay: ReplayData | null }
   | { t: 'events'; effects: GameEffect[]; revision: number }
   | { t: 'snapshot'; state: GameState }

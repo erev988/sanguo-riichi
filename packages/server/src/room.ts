@@ -7,6 +7,7 @@ import {
   generalById,
   legalActions,
   resolveRules,
+  sha256Hex,
   step,
   type Action,
   type GameEffect,
@@ -73,6 +74,7 @@ export class Room {
     private minPlayers = 2,
   ) {
     this.id = id;
+    this.rotateServerSeed(); // 建房即锁定并公布首个种子承诺（服务器无法事后更换）
   }
 
   /**
@@ -106,6 +108,7 @@ export class Room {
           m.isAI = false; // 取消 AI 托管
           this.sockets.set(ws, seat);
           this.broadcastRoom();
+          this.sendSeedCommit(ws); // 重连也补发当前种子承诺
           this.scheduleAI();
           return { seat, started: this.started, rejoined: true };
         }
@@ -129,6 +132,7 @@ export class Room {
     this.sockets.set(ws, seat);
     if (token) this.tokens.set(token, seat);
     this.broadcastRoom();
+    this.sendSeedCommit(ws); // 入座即下发当前种子承诺（局前锁定，局后可验证）
     if (this.members.size >= 4) this.startInternal();
     return { seat, started: this.started, rejoined: false };
   }
@@ -406,6 +410,56 @@ export class Room {
       });
   }
 
+  /** 本局的服务器种子（局前只公布其哈希，局后才公开） */
+  private roundServerSeed = '';
+  /** 服务器种子的承诺哈希（开局前公布 → 服务器无法事后换种子） */
+  private seedCommit = '';
+  /** 各家贡献的随机数（参与定牌；未提交者由服务器代生成） */
+  private clientSeeds = new Map<number, string>();
+
+  /**
+   * 轮换服务器种子并立即公布承诺哈希。
+   * 顺序很关键：先广播 commit，客户端收到后才发自己的随机数 →
+   * 服务器无法根据玩家的随机数来挑选对自己有利的种子。
+   */
+  private rotateServerSeed(): void {
+    this.roundServerSeed = randomBytes(32).toString('hex');
+    this.seedCommit = sha256Hex(this.roundServerSeed);
+    this.clientSeeds.clear();
+    this.broadcastSeedCommit();
+  }
+
+  private broadcastSeedCommit(): void {
+    for (const m of this.members.values()) this.sendSeedCommit(m.ws);
+  }
+
+  /** 给单个连接下发当前种子承诺（入座/重连时调用） */
+  private sendSeedCommit(ws: WebSocket | null | undefined): void {
+    if (!ws) return;
+    try {
+      ws.send(JSON.stringify({ t: 'seedCommit', commit: this.seedCommit }));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** 玩家贡献随机数（本局定牌前有效） */
+  handleClientSeed(ws: WebSocket, seed: string): void {
+    if (this.state?.phase === 'playing') return; // 本局已定牌，忽略
+    for (const [seat, m] of this.members) {
+      if (m.ws === ws) {
+        this.clientSeeds.set(seat, seed);
+        return;
+      }
+    }
+  }
+
+  /** 本局盐 = sha256(服务器种子 : 各家随机数)，并返回各家随机数用于局后公开验证 */
+  private computeSalt(): { salt: string; clientSeeds: string[] } {
+    const list = [0, 1, 2, 3].map((i) => this.clientSeeds.get(i) ?? randomBytes(16).toString('hex'));
+    return { salt: sha256Hex(`${this.roundServerSeed}:${list.join('|')}`), clientSeeds: list };
+  }
+
   private startInternal(): void {
     if (this.started) return;
     this.started = true;
@@ -424,9 +478,13 @@ export class Room {
       const m = this.members.get(seat)!;
       return { name: m.name, generalId: m.generalId, isAI: m.isAI };
     });
-    this.state = createGame(configs, { seed: this.seed, rules: this.rules });
+    // ★ 定牌：种子输入 = 服务器种子 + 盐(由各家随机数派生)；局前只公布过种子的哈希
+    const { salt, clientSeeds } = this.computeSalt();
+    const serverSeed = this.roundServerSeed;
+    const seedInput = `${serverSeed}:${salt}`;
+    this.state = createGame(configs, { seed: seedInput, rules: this.rules });
     // 录像：记录开局元信息与首局起点
-    this.meta = { seats: configs, rules: this.rules, seed: this.seed };
+    this.meta = { seats: configs, rules: this.rules, seed: seedInput };
     this.rounds = [];
     this.currentActions = [];
     this.roundStart = { round: this.state.round, dealer: this.state.dealer };
@@ -434,6 +492,7 @@ export class Room {
     this.broadcastRoom(); // 通知全房间：已开局（含成员/AI 情况）
 
     const effects: GameEffect[] = [
+      { type: 'seedReveal', serverSeed, clientSeeds, salt }, // 公开定牌信息，任何人可验证
       { type: 'gameStarted', round: this.state.round, dealer: this.state.dealer, seats: this.seatInfos() },
       { type: 'dora', indicators: this.state.doraIndicators.slice(0, this.state.doraCount) },
       { type: 'wall', count: this.state.wall.length },
@@ -442,6 +501,7 @@ export class Room {
       effects.push({ type: 'hand', player: p.seat, tiles: [...p.hand], targetSeat: p.seat });
     }
     this.broadcast(effects);
+    this.rotateServerSeed(); // 为下一局提前锁定新种子
     this.scheduleAI();
   }
 
@@ -556,12 +616,16 @@ export class Room {
     clearTimeout(this.nextTimer);
     this.nextTimer = setTimeout(() => {
       if (!this.state) return;
-      const next = advanceRound(this.state, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`); // 每局独立 128 位种子
+      // ★ 下一局定牌：沿用「开局时已轮换并公布承诺」的服务器种子 + 玩家贡献的随机数
+      const { salt, clientSeeds } = this.computeSalt();
+      const serverSeed = this.roundServerSeed;
+      const next = advanceRound(this.state, `${serverSeed}:${salt}`);
       if (next === this.state) return; // 整场结束
       this.state = next;
       this.roundStart = { round: next.round, dealer: next.dealer };
       this.timedOutPlayers.clear(); // 新局：重置超时标记
       const effects: GameEffect[] = [
+        { type: 'seedReveal', serverSeed, clientSeeds, salt },
         { type: 'gameStarted', round: next.round, dealer: next.dealer, seats: this.seatInfos() },
         { type: 'dora', indicators: next.doraIndicators.slice(0, next.doraCount) },
         { type: 'wall', count: next.wall.length },
@@ -570,6 +634,7 @@ export class Room {
         effects.push({ type: 'hand', player: p.seat, tiles: [...p.hand], targetSeat: p.seat });
       }
       this.broadcast(effects);
+      this.rotateServerSeed(); // 为再下一局锁定新种子
       this.scheduleAI();
     }, 2000);
   }

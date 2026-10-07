@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calcTenpai, mulberry32, shanten, type Tile } from '../src/index';
+import { calcTenpai, sha256Rng, shanten, type Tile } from '../src/index';
 
 describe('向听数计算', () => {
   it('和牌形（14 张）→ -1', () => {
@@ -51,7 +51,7 @@ describe('向听数计算', () => {
   });
 
   it('一致性：随机手牌 shanten===0 ⟺ calcTenpai 非空', () => {
-    const rng = mulberry32(20241006);
+    const rng = sha256Rng('20241006');
     let checked = 0;
     for (let iter = 0; iter < 300; iter++) {
       // 造 13 张「合法」手牌（每种至多 4 张）

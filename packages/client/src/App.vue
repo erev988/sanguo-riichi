@@ -3,6 +3,7 @@ import {
   ALL_GENERALS,
   calcTenpai,
   replayGame,
+  sha256Hex,
   tileName,
   type Action,
   type GameEffect,
@@ -419,6 +420,21 @@ function handleEffect(e: GameEffect): void {
         pendingDiscard.value = { player: e.player, tile: e.tile, chankan: true };
       }
       break;
+    case 'seedReveal': {
+      // 冻结「本局」的承诺指纹：服务器开局后会立刻为下一局轮换承诺，不能让它覆盖本局记录
+      const commitForThisRound = seedInfo.value.commit;
+      seedInfo.value = {
+        commit: commitForThisRound,
+        verifiedCommit: commitForThisRound,
+        serverSeed: e.serverSeed,
+        clientSeeds: e.clientSeeds,
+        salt: e.salt,
+        // 本地重算承诺哈希：与开局前公布的一致 → 证明服务器未事后更换种子
+        verified:
+          commitForThisRound === '' ? undefined : sha256Hex(e.serverSeed) === commitForThisRound,
+      };
+      break;
+    }
     case 'skill-pay': {
       const line = describe(e, memberName);
       if (line) pushToast(line); // 顶部提示，5 秒后自动消失
@@ -516,6 +532,10 @@ function handleMsg(msg: ServerMsg): void {
       break;
     case 'rooms':
       rooms.value = msg.rooms;
+      break;
+    case 'seedCommit':
+      seedInfo.value = { commit: msg.commit };
+      sendClientSeed(); // 承诺已锁定 → 贡献本方随机数
       break;
     case 'matching':
       matching.value = msg.waiting;
@@ -731,6 +751,32 @@ function pickRoom(r: { id: string; locked: boolean; started: boolean }): void {
   }
   joinPassword.value = '';
   joinById(r.id, '');
+}
+
+/** 本局定牌信息（牌局公正性：承诺 → 局后公开 → 本地校验） */
+const seedInfo = ref<{
+  commit: string;
+  /** 本局定牌时被冻结的指纹（下一局的承诺会覆盖 commit，故单独记录） */
+  verifiedCommit?: string;
+  serverSeed?: string;
+  clientSeeds?: string[];
+  salt?: string;
+  verified?: boolean;
+}>({ commit: '' });
+const showSeedDetail = ref(false);
+
+/** 生成本局贡献的随机数（16 字节 → hex） */
+function makeClientSeed(): string {
+  const b = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(b);
+  else for (let i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256);
+  return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/** 收到服务器种子承诺后立即贡献本方随机数（服务器此时已锁定种子，无法挑对我们不利的牌） */
+function sendClientSeed(): void {
+  if (!connected.value) return;
+  net.send({ t: 'clientSeed', seed: makeClientSeed() });
 }
 
 /** 正在匹配：等待的真人数量（0 = 未在匹配） */
@@ -1256,6 +1302,30 @@ onBeforeUnmount(() => {
             </div>
           </template>
 
+          <div v-if="seedInfo.verifiedCommit || seedInfo.commit" class="seed-card">
+            <div class="seed-head">
+              <span class="seed-label">牌局指纹</span>
+              <code class="seed-val">{{ (seedInfo.verifiedCommit ?? seedInfo.commit).slice(0, 16) }}…</code>
+              <span v-if="seedInfo.verified === true" class="seed-ok">✅ 公正性已验证</span>
+              <span v-else-if="seedInfo.verified === false" class="seed-bad">❌ 校验失败</span>
+              <button
+                v-if="seedInfo.serverSeed"
+                class="mini"
+                @click="showSeedDetail = !showSeedDetail"
+              >
+                {{ showSeedDetail ? '收起' : '详情' }}
+              </button>
+            </div>
+            <div v-if="showSeedDetail" class="seed-detail">
+              <div>服务器种子：<code>{{ seedInfo.serverSeed }}</code></div>
+              <div>玩家随机数：<code>{{ (seedInfo.clientSeeds ?? []).join(' ') }}</code></div>
+              <div>盐：<code>{{ seedInfo.salt }}</code></div>
+              <div class="seed-note">
+                验证方式：sha256(服务器种子) 应等于开局前公布的指纹；牌序由「种子:盐」经 SHA-256
+                计数器流唯一确定，局后可自行复算。
+              </div>
+            </div>
+          </div>
           <table v-if="result.payments.length" class="pay-table">
             <tr v-for="(p, i) in result.payments" :key="i">
               <td>{{ p.from >= 0 ? memberName(p.from) + " → " + memberName(p.to) : "立直棒 → " + memberName(p.to) }}</td>

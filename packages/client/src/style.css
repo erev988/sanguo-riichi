@@ -1695,3 +1695,60 @@ textarea {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* ---------- 牌局指纹（公正性验证卡片） ---------- */
+.seed-card {
+  margin: 12px 0 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(75, 58, 36, 0.06);
+  border: 1px solid rgba(75, 58, 36, 0.18);
+  font-size: 12px;
+}
+
+.seed-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.seed-label {
+  color: #6b5b40;
+}
+
+.seed-val {
+  font-size: 12px;
+  color: #3c3226;
+  background: rgba(75, 58, 36, 0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.seed-ok {
+  color: #2f7d4f;
+}
+
+.seed-bad {
+  color: #a4352c;
+}
+
+.seed-detail {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(75, 58, 36, 0.25);
+  word-break: break-all;
+  color: #4a3f31;
+  line-height: 1.7;
+}
+
+.seed-detail code {
+  font-size: 11px;
+}
+
+.seed-note {
+  margin-top: 4px;
+  color: #6b5b40;
+  font-size: 11px;
+  line-height: 1.6;
+}

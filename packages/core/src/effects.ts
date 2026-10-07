@@ -42,8 +42,7 @@ export type GameEffect =
   | { type: 'timer'; seat: number; ms: number; total: number; targetSeat: number }
   | { type: 'scores'; scores: number[] }
   | {
-      type: 'agaru';
-      winner: number;
+      type: 'agaru';      winner: number;
       kind: 'tsumo' | 'ron';
       han: number;
       fu: number;
@@ -57,6 +56,16 @@ export type GameEffect =
       melds?: Meld[];
       /** 和牌张 */
       winTile?: number;
+    }
+  | {
+      /** 定牌信息公开：局后公布，用于验证牌序未被篡改（provably fair） */
+      type: 'seedReveal';
+      /** 服务器种子（局后公开；局前只公布其哈希） */
+      serverSeed: string;
+      /** 各家贡献的随机数（未提交者由服务器代生成） */
+      clientSeeds: string[];
+      /** 最终盐 = sha256(serverSeed : clientSeeds...) */
+      salt: string;
     }
   | { type: 'ryukyoku'; tenpai: boolean[]; payments: Payment[]; kind?: 'howanpai' | 'kyuushu' | 'suufon' | 'suukantsu' | 'suuchariichi' }
   | { type: 'gameEnded'; scores: number[]; reason: 'normal' | 'tobi' | 'ryukyoku' };
