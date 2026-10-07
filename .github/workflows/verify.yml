@@ -29,5 +29,38 @@ jobs:
       - name: 前端引用完整性（模板/脚本引用未定义标识符 + 关键链路断言）
         run: node tools/check-client-refs.mjs
 
+      - name: 界面可见性静态断言
+        run: node tools/check-ui-visibility.mjs
+
       - name: 前端构建
         run: npm run build -w @sanguo/client
+
+  # 真实布局断言（复测报告 §9.3 改造 5）：需要浏览器，单独一个 job
+  visibility-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: 安装浏览器
+        run: npx playwright install --with-deps chromium
+      - name: 起服务端
+        run: |
+          PORT=8899 npx tsx packages/server/src/index.ts &
+          sleep 4
+      - name: 起前端（代理到 8899）
+        run: |
+          VITE_WS_URL=ws://127.0.0.1:8899 npm run dev -w @sanguo/client -- --port 5173 &
+          sleep 6
+      - name: 可见性断言（牌河不被裁 / 手牌不遮牌河 / 高亮与网格生效）
+        env:
+          E2E_PORT: '8899'
+        run: npx playwright test -c packages/client
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trace
+          path: packages/client/test-results
