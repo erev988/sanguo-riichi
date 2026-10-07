@@ -251,3 +251,44 @@ describe('回归：七对与标准形择优（P1-5）', () => {
     expect(r!.hanTotal).toBeGreaterThan(2); // 七对子只有 2 番
   });
 });
+
+describe('回归：复测报告 R-1 / R-2', () => {
+  const baseCtx = (juntehai: Tile[], agariPai: Tile, isTsumo = false): Parameters<typeof evaluateAgari>[0] => ({
+    juntehai,
+    agariPai,
+    fuuro: [],
+    menzen: true,
+    isTsumo,
+    riichi: { accepted: false, double: false, ippatsu: false },
+    rinshan: false,
+    chankan: false,
+    isHaitei: false,
+    virgin: false,
+    agariPlayer: 0,
+    chancha: 0,
+    bakaze: 31 as Tile,
+    jikaze: 31 as Tile,
+    kuitan: true,
+  });
+
+  it('R-1：全字牌七对 → 役满「字一色」（此前七对分支不过役满判定，只给混老头+七对子）', () => {
+    const r = evaluateAgari(
+      baseCtx([31, 31, 32, 32, 33, 33, 34, 34, 35, 35, 36, 36, 37], 37, true),
+    );
+    expect(r).not.toBeNull();
+    expect(r!.yakuman.map((y) => y.name)).toContain('字一色');
+    expect(r!.yakumanTotal).toBeGreaterThanOrEqual(1);
+  });
+
+  it('R-2：111m222m333m44p55p 荣和 5p → 4 番（三暗刻+对对和），不得混入另一拆法的一杯口', () => {
+    const r = evaluateAgari(
+      baseCtx([1, 1, 1, 2, 2, 2, 3, 3, 3, 14, 14, 15, 15], 15, false),
+    );
+    expect(r).not.toBeNull();
+    const names = r!.yaku.map((y) => y.name);
+    expect(names).toContain('三暗刻');
+    // 一杯口只在「123m×3」那种拆法里成立，不能与刻子拆法的三暗刻叠加
+    expect(names).not.toContain('一杯口');
+    expect(r!.hanTotal).toBe(4);
+  });
+});

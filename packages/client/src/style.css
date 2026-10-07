@@ -221,20 +221,10 @@ button.ron:hover {
   max-height: 38px;
 }
 
-.seat.top {
-  grid-area: top;
-}
-.seat.left {
-  grid-area: left;
-}
-.seat.right {
-  grid-area: right;
-}
-.seat.self {
-  grid-area: self;
-  border-style: solid;
-  border-color: rgba(201, 162, 39, 0.25);
-}
+
+
+
+
 
 .seat header {
   display: flex;
@@ -416,27 +406,14 @@ button.ron:hover {
 }
 
 /* 刚摸的牌：与手牌分开并侧移 */
-.controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
+
 
 .row.hand .tile.just-drawn {
   margin-left: 12px;
 }
 
 /* ---------- 中央：弃牌环 + 场况（固定在所属格内） ---------- */
-.center {
-  grid-area: center;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.22);
-  padding: 6px;
-  min-height: 0;
-  overflow: hidden;
-}
+
 
 /* ---------- 大厅 ---------- */
 .lobby {
@@ -951,14 +928,7 @@ button.join {
   display: none;
 }
 
-.river-mid {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 10px;
-  align-items: center;
-  min-height: 0;
-  overflow: hidden;
-}
+
 
 .river-left,
 .river-right {
@@ -1029,11 +999,7 @@ button.join {
 }
 
 /* 手牌与操作：居中 */
-.seat.self .row.hand {
-  flex-wrap: nowrap;
-  justify-content: center;
-  overflow: hidden;
-}
+
 
 .seat.self .controls {
   display: flex;
@@ -1171,10 +1137,7 @@ button.riichi.active {
   overflow: hidden;
 }
 
-.seat.self .row.hand {
-  height: 50px;
-  align-items: flex-end;
-}
+
 
 /* 中央方块尺寸固定：数字变化不重排 */
 .core {
@@ -1913,4 +1876,75 @@ textarea {
   .tile.last {
     animation: none;
   }
+}
+
+/* ============================================================================
+   §9 布局根治（复测报告 R-3/R-5）：不再靠「硬编码让位 + 深色遮罩」，
+   改为「行高由内容决定 + 信息区不裁剪 + 遮罩只留手牌正后方一圈」
+   ========================================================================== */
+
+/* 三行：对家区(auto) / 中央区(占满剩余) / 自家区(auto 由内容撑开)
+   —— 删掉 padding-bottom:106px 的「祈祷式让位」（它比手牌层实际高度少 12px） */
+.table {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 8px;
+  padding-bottom: 8px;
+  gap: 5px;
+}
+
+/* 信息区一律不裁剪（任何 overflow:hidden 出现在信息区都是 bug 种子） */
+.seat {
+  overflow: visible;
+}
+
+/* 删掉深色大面积遮罩（0.4→0.6 的黑盖在 28px 牌河上等于不可见） */
+.seat.self::before {
+  display: none;
+}
+
+/* 手牌区改为「手牌正后方一圈」的轻微衬托，透明度 ≤0.3（§9.2 原则 3） */
+.seat.self {
+  background: radial-gradient(
+    closest-side,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.12) 62%,
+    transparent 100%
+  );
+  border-radius: 8px;
+}
+
+/* 自家区上缘加一条黄铜分隔线，替代原先靠遮罩表达的「悬浮感」 */
+.seat.self::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.35), transparent);
+}
+
+/* 小视口整体缩放（§9.3 改造 4）：不够高就等比缩小，而不是裁掉某一区域 */
+@media (max-height: 470px) {
+  .table {
+    transform: scale(0.94);
+    transform-origin: center center;
+  }
+}
+
+@media (max-height: 420px) {
+  .table {
+    transform: scale(0.88);
+  }
+}
+
+/* R-5：侧家牌背提亮（此前 16px 深绿贴暗底几乎不可辨） */
+.backs-v .back-side,
+.back-side {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.09) 0 3px, transparent 3px 6px),
+    linear-gradient(160deg, #6d8f74, #46604f 55%, #364a3c);
+  border: 1px solid rgba(233, 226, 211, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  min-width: 12px;
 }

@@ -162,6 +162,24 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   let chiitoiResult: AgariResult | null = null;
   if (isChiitoi(c14)) {
     const yakuCtx = makeYakuContext(ctx, all, c14, [], true, false);
+    // ★ 七对形同样可以役满（字一色 / 绿一色 / 清老头 / 大三元…）：
+    //   此前七对分支不经过 YAKUMAN_LIST，导致「全字牌七对」只给混老头+七对子
+    const chiitoiYakuman = YAKUMAN_LIST.filter((y) => y.predicate(yakuCtx)).map((y) => ({
+      name: y.name,
+      han: 1,
+    }));
+    if (chiitoiYakuman.length > 0) {
+      const total = Math.min(chiitoiYakuman.reduce((a, x) => a + x.han, 0), ctx.yakumanMax ?? 2);
+      return {
+        yaku: [],
+        hanTotal: 0,
+        fu: 0,
+        yakuman: chiitoiYakuman,
+        yakumanTotal: total,
+        agariPai: ctx.agariPai,
+        winDecomp: null,
+      };
+    }
     const yaku = collectYaku(yakuCtx);
     addDora(ctx, all, yaku);
     chiitoiResult = {
@@ -268,7 +286,29 @@ function makeYakuContext(
   };
 }
 
+/**
+ * 役种收集：**必须按「单个拆法」整体计算**。
+ * 此前把所有拆法一起喂给 predicate，会出现跨拆法叠加
+ * （例：一杯口来自顺子拆法、三暗刻来自刻子拆法，两者本不该同时成立）。
+ * 现在逐拆法匹配 → 取总番数最高的一组。
+ */
 function collectYaku(ctx: YakuContext): AgariYaku[] {
+  if (ctx.decomp.length === 0) return matchYaku(ctx); // 七对/国士形（无标准拆法）
+  let best: AgariYaku[] = [];
+  let bestHan = -1;
+  for (const d of ctx.decomp) {
+    const one = matchYaku({ ...ctx, decomp: [d] });
+    const han = one.reduce((a, x) => a + x.han, 0);
+    if (han > bestHan) {
+      bestHan = han;
+      best = one;
+    }
+  }
+  return best;
+}
+
+/** 单拆法下的役匹配（含 shadows 互斥） */
+function matchYaku(ctx: YakuContext): AgariYaku[] {
   const hit = YAKU_LIST.filter((y) => y.predicate(ctx));
   const excluded = new Set(hit.flatMap((y) => y.shadows ?? []));
   const kept = hit.filter((y) => !excluded.has(y.name));
