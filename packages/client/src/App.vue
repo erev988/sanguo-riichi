@@ -2,13 +2,11 @@
 import {
   ALL_GENERALS,
   calcTenpai,
-  replayGame,
   sha256Hex,
   tileName,
   type Action,
   type GameEffect,
   type Meld,
-  type ReplayData,
   type Tile,
 } from '@sanguo/core';
 import type { ServerMsg } from '@sanguo/shared';
@@ -140,13 +138,6 @@ interface Frame {
   logs: string[];
   lastDrawn: Tile | null;
 }
-const replayFrames = ref<Frame[]>([]);
-const replayIdx = ref(0);
-const replayActive = ref(false);
-const replayPlaying = ref(false);
-const replaySpeed = ref(2);
-const replayInfo = ref('');
-let replayTimer: ReturnType<typeof setInterval> | null = null;
 
 /** 我的实际武将（以房间成员为准，入座后可在选将区切换） */
 const myGeneralId = computed(
@@ -186,8 +177,7 @@ const liveFrame = computed<Frame>(() => ({
   lastDrawn: lastDrawn.value,
 }));
 
-const replayFrame = computed<Frame | null>(() => replayFrames.value[replayIdx.value] ?? null);
-const shown = computed<Frame>(() => (replayActive.value ? (replayFrame.value ?? liveFrame.value) : liveFrame.value));
+const shown = computed<Frame>(() => liveFrame.value);
 
 /** 牌序：万→饼→索→字（赤 5 归入 5 的位置） */
 const normTile = (t: Tile): number => (t === 0 ? 5 : t === 10 ? 15 : t === 20 ? 25 : t);
@@ -542,10 +532,6 @@ function handleMsg(msg: ServerMsg): void {
       status.value =
         msg.waiting >= 4 ? '匹配成功，进入对局…' : `正在匹配…（${msg.waiting}/4 名真人）`;
       break;
-    case 'replay':
-      if (msg.replay) loadReplay(msg.replay);
-      else pushLog('（本房暂无录像）');
-      break;
     case 'events':
       for (const e of msg.effects) handleEffect(e);
       break;
@@ -585,122 +571,6 @@ function handleMsg(msg: ServerMsg): void {
 }
 
 // ---- 回放 ----
-function loadReplay(data: ReplayData): void {
-  const frames: Frame[] = [];
-  let acc: string[] = [];
-  const nameOf = (s: number): string => data.seats[s]?.name ?? `P${s + 1}`;
-  let dora: Tile[] = [];
-  let wallN = 0;
-  replayGame(data, (state, effects) => {
-    for (const e of effects) {
-      const line = describe(e, nameOf);
-      if (line) {
-        acc = [line, ...acc].slice(0, 200);
-      }
-      if (e.type === 'dora') dora = e.indicators;
-      if (e.type === 'wall') wallN = e.count;
-    }
-    const [rt, ht] = roundLabel(state.round);
-    frames.push({
-      roundText: rt,
-      honbaText: ht,
-      scores: state.players.map((p) => p.score),
-      hands: state.players.map((p) => [...p.hand]),
-      handCounts: state.players.map((p) => p.hand.length),
-      discards: state.players.map((p) => [...p.discards]),
-      melds: state.players.map((p) => [...p.openMelds]),
-      riichi: state.players.map((p) => p.log.riichi),
-      riichiDiscardIdx: {},
-      current: state.current,
-      riichiSticks: state.riichiSticks,
-      logs: acc,
-      lastDrawn: null,
-    });
-  });
-  if (frames.length === 0) {
-    pushLog('录像为空');
-    return;
-  }
-  replayFrames.value = frames;
-  replayIdx.value = 0;
-  replayActive.value = true;
-  replayInfo.value = `房间 ${data.roomId} · ${frames.length} 步 · ${new Date(data.createdAt).toLocaleString()}`;
-  pushLog(`📽 载入录像：${data.rounds.length} 局 / ${frames.length} 步`);
-}
-
-function setReplayIdx(i: number): void {
-  replayIdx.value = Math.max(0, Math.min(replayFrames.value.length - 1, i));
-}
-
-function replayToggle(): void {
-  replayPlaying.value = !replayPlaying.value;
-}
-
-function stopReplay(): void {
-  replayPlaying.value = false;
-  replayActive.value = false;
-  replayFrames.value = [];
-  replayIdx.value = 0;
-}
-
-// 自动播放
-watch([replayPlaying, replaySpeed], () => {
-  if (replayTimer) {
-    clearInterval(replayTimer);
-    replayTimer = null;
-  }
-  if (!replayPlaying.value) return;
-  const interval = Math.max(60, 900 / replaySpeed.value);
-  replayTimer = setInterval(() => {
-    if (replayIdx.value >= replayFrames.value.length - 1) {
-      replayPlaying.value = false;
-      return;
-    }
-    replayIdx.value += 1;
-  }, interval);
-});
-
-/** 连接（只建立 WS，不入座） */
-function connectOnly(): void {
-  void enterFullscreenLandscape(); // 移动端：自动进入全屏并锁横屏
-  net.onOpen = () => {
-    connected.value = true;
-    if (joinedRoom) {
-      status.value = '重连中，恢复座位…';
-      sendJoin(joinedRoom, ''); // 断线后自动复座（token 免密码）
-    } else {
-      status.value = '已连接';
-      net.send({ t: 'rooms' }); // 连上后顺手拉一次房间列表
-    }
-  };
-  net.onClose = () => {
-    connected.value = false;
-    status.value = '连接断开，正在重连…';
-  };
-  net.onReconnecting = (attempt, delayMs) => {
-    status.value = `连接断开，${Math.round(delayMs / 1000)}s 后重连（第 ${attempt} 次）…`;
-  };
-  net.onMsg = handleMsg;
-  const wsUrl =
-    (import.meta.env.VITE_WS_URL as string | undefined) ??
-    `ws://${location.hostname || 'localhost'}:8787`;
-  net.connect(wsUrl);
-  status.value = '连接中…';
-}
-
-function sendJoin(room: string, pwd: string): void {
-  net.send({
-    t: 'join',
-    payload: {
-      name: name.value,
-      roomId: room,
-      generalId: generalId.value,
-      rules: { kiriageMangan: kiriageMangan.value },
-      token: token.value,
-      password: pwd,
-    },
-  });
-}
 
 /** 创建房间（并作为房主进入） */
 function createRoom(): void {
@@ -855,7 +725,7 @@ const riichiMode = ref(false);
 /** 当前能否立直（门清、未立直、14 张、且存在打出后即听牌的牌） */
 const canRiichiNow = computed(() => {
   const me = mySeat.value;
-  if (me == null || replayActive.value || ended.value) return false;
+  if (me == null || ended.value) return false;
   const h = shown.value.hands[me] ?? [];
   if (h.length !== 14) return false;
   if (shown.value.riichi[me]) return false;
@@ -864,7 +734,7 @@ const canRiichiNow = computed(() => {
 });
 
 function discardTile(t: Tile): void {
-  if (ended.value || replayActive.value) return;
+  if (ended.value) return;
   act({ type: 'discard', tile: t, riichi: riichiMode.value });
   riichiMode.value = false;
 }
@@ -929,7 +799,6 @@ onBeforeUnmount(() => {
     document.removeEventListener('visibilitychange', handleVisibility);
   }
   if (tickTimer) clearInterval(tickTimer);
-  if (replayTimer) clearInterval(replayTimer);
   net.close();
 });
 </script>
@@ -1194,7 +1063,7 @@ onBeforeUnmount(() => {
 
         <!-- 上层：自己的手牌层（副露 + 手牌 + 倒计时，与下方牌河分层） -->
         <section class="seat self" :class="{ turn: shown.current === seats.self }">
-          <div v-if="!replayActive" class="controls">
+          <div class="controls">
             <button
               v-if="canRiichiNow"
               class="riichi"
@@ -1240,14 +1109,14 @@ onBeforeUnmount(() => {
                 @click="discardTile(shown.lastDrawn)"
               />
             </span>
-            <span v-if="remainSec !== null && !replayActive" class="timer" :class="{ urgent: inExtraTime }">
+            <span v-if="remainSec !== null" class="timer" :class="{ urgent: inExtraTime }">
               {{ remainSec }}s
             </span>
           </div>
         </section>
       </div>
 
-      <p v-if="ended && !replayActive" class="ended">—— {{ reason }} ——</p>
+      <p v-if="ended" class="ended">—— {{ reason }} ——</p>
 
     </template>
 

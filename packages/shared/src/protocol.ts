@@ -1,4 +1,4 @@
-import type { Action, GameEffect, GameState, ReplayData, Rules, SeatConfig, SeatInfo } from '@sanguo/core';
+import type { Action, GameEffect, GameState, Rules, SeatConfig, SeatInfo } from '@sanguo/core';
 import { z } from 'zod';
 
 // ============================================================================
@@ -98,7 +98,6 @@ export const ClientMsgSchema = z.discriminatedUnion('t', [
   /** 查询房间列表 */
   z.object({ t: z.literal('rooms') }),
   /** 获取本房最近一局回放 */
-  z.object({ t: z.literal('replay') }),
   z.object({ t: z.literal('ping') }),
 ]);
 
@@ -142,10 +141,9 @@ export type ServerMsg =
   | { t: 'matching'; waiting: number }
   /** 服务器对本局种子（+盐）的承诺哈希：开局前公布，局后可用公开值验证未被篡改 */
   | { t: 'seedCommit'; commit: string }
-  | { t: 'replay'; replay: ReplayData | null }
   | { t: 'events'; effects: GameEffect[]; revision: number }
   | { t: 'snapshot'; state: GameState }
   | { t: 'error'; code: string; seq?: number }
   | { t: 'pong' };
 
-export { type Action, type GameEffect, type GameState, type SeatInfo, type Rules, type SeatConfig, type ReplayData };
+export { type Action, type GameEffect, type GameState, type SeatInfo, type Rules, type SeatConfig };

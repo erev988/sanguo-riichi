@@ -12,8 +12,6 @@ import {
   type Action,
   type GameEffect,
   type GameState,
-  type ReplayData,
-  type ReplayRound,
   type RoundInfo,
   type Rules,
   type SeatConfig,
@@ -51,10 +49,6 @@ export class Room {
   /** 房间密码（房主设置；空串表示无密码） */
   private password = '';
   // ---- 录像：记录动作序列即可完整重放（引擎为纯函数） ----
-  private meta?: { seats: SeatConfig[]; rules: Rules; seed: string };
-  private rounds: ReplayRound[] = [];
-  private currentActions: { seat: number; action: Action }[] = [];
-  private roundStart?: { round: RoundInfo; dealer: number };
   private aiTimer?: ReturnType<typeof setTimeout>;
   private drawTimer?: ReturnType<typeof setTimeout>;
   private thinkTimers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -220,10 +214,6 @@ export class Room {
         if (gid) this.setGeneral(seat, gid);
         break;
       }
-      case 'replay': {
-        ws.send(JSON.stringify({ t: 'replay', replay: this.replay() }));
-        break;
-      }
     }
   }
 
@@ -265,7 +255,6 @@ export class Room {
     const res = step(this.state, action, { skillsOf: (s) => this.skillsOf(s) });
     if (!res.error) {
       // 只有被引擎接受的动作才录进回放
-      this.currentActions.push({ seat, action });
     }
     this.state = res.state;
     this.broadcast(res.effects);
@@ -483,11 +472,6 @@ export class Room {
     const serverSeed = this.roundServerSeed;
     const seedInput = `${serverSeed}:${salt}`;
     this.state = createGame(configs, { seed: seedInput, rules: this.rules });
-    // 录像：记录开局元信息与首局起点
-    this.meta = { seats: configs, rules: this.rules, seed: seedInput };
-    this.rounds = [];
-    this.currentActions = [];
-    this.roundStart = { round: this.state.round, dealer: this.state.dealer };
     this.timedOutPlayers.clear(); // 新局：重置超时标记
     this.broadcastRoom(); // 通知全房间：已开局（含成员/AI 情况）
 
@@ -608,11 +592,6 @@ export class Room {
 
   /** 一局结束后自动开新局（连庄/进庄）；整场结束则不动作 */
   private scheduleNextRound(): void {
-    // 归档本局录像
-    if (this.roundStart && this.currentActions.length > 0) {
-      this.rounds.push({ ...this.roundStart, actions: [...this.currentActions] });
-    }
-    this.currentActions = [];
     clearTimeout(this.nextTimer);
     this.nextTimer = setTimeout(() => {
       if (!this.state) return;
@@ -622,7 +601,6 @@ export class Room {
       const next = advanceRound(this.state, `${serverSeed}:${salt}`);
       if (next === this.state) return; // 整场结束
       this.state = next;
-      this.roundStart = { round: next.round, dealer: next.dealer };
       this.timedOutPlayers.clear(); // 新局：重置超时标记
       const effects: GameEffect[] = [
         { type: 'seedReveal', serverSeed, clientSeeds, salt },
@@ -640,20 +618,7 @@ export class Room {
   }
 
   /** 获取回放数据（含已结束的局与进行中的局） */
-  replay(): ReplayData | null {
-    if (!this.meta) return null;
-    const rounds = [...this.rounds];
-    if (this.roundStart && this.currentActions.length > 0) {
-      rounds.push({ ...this.roundStart, actions: [...this.currentActions] });
-    }
-    return {
-      id: `${this.id}-${Date.now()}`,
-      roomId: this.id,
-      createdAt: Date.now(),
-      ...this.meta,
-      rounds,
-    };
-  }
+
 
   private stopAI(): void {
     clearTimeout(this.aiTimer);
