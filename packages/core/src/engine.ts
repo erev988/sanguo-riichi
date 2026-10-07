@@ -376,20 +376,21 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (!hasRealYaku(win2) && !hasForceWinR && win2.han < 1) return fail('无役且无番，不能荣和');
       const otherPayments: Payment[] = [];
       applyOtherAgaruSkills(s, opts, winner, otherPayments); // 他人和牌钩子（妄尊）
-      const first = s.agariThisTurn.length === 0; // 頭跳ね：仅第一家和牌者得立直棒/本场
+      // ★ 供托/本场的归属不在这里决定：一炮多响时按「放铳者下家方向最近者」定，
+      //   与消息到达顺序无关 → 统一放到窗口收尾（case 'pass'）结算
       const payments = [
         ...computePayments({ ...win2, kind: 'ron' }, winner, s.dealer, action.from, {
-          riichiSticks: first ? s.riichiSticks : 0,
-          honba: first ? s.round.honba : 0,
+          riichiSticks: 0,
+          honba: 0,
           kiriageMangan: s.rules.kiriageMangan,
         }),
         ...skillPayments,
         ...otherPayments,
       ];
       applyPayments(s, payments, opts);
-      if (first) s.riichiSticks = 0;
+      // 立直棒在收尾时统一交给頭跳ね得主（此处不清零，见 case 'pass'）
       s.agariThisTurn.push(winner);
-      clearIppatsu(s);
+      // ★ 不在此清一发：同一张牌多家荣和时，各家的一发都应成立（收尾时统一清理）
       effects.push({
         type: 'agaru', winner, kind: 'ron', han: win2.han, fu: win2.fu, yaku: win2.yaku, payments,
         skills: skillLog,
@@ -406,6 +407,23 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
     case 'pass': {
       if (s.agariThisTurn.length > 0) {
         // 一炮多响结算完毕 → 终局
+        // ★ 頭跳ね：供托/本场归「放铳者下家方向最近」的和牌者（此前按消息到达顺序，可能给错人）
+        const from = s.players.findIndex((x) => x.seat === (s.lastDiscard?.player ?? -1));
+        const others = s.agariThisTurn.filter((w) => w !== from);
+        const head = others.length > 0 ? others.sort((a, b) => ((a - from + 4) % 4) - ((b - from + 4) % 4))[0] : s.agariThisTurn[0];
+        const bonus = [];
+        if (s.riichiSticks > 0) {
+          for (let i = 0; i < s.riichiSticks; i++) bonus.push({ from: -1, to: head, amount: 1000 });
+        }
+        if (s.round.honba > 0 && from >= 0) {
+          bonus.push({ from, to: head, amount: 300 * s.round.honba });
+        }
+        if (bonus.length > 0) {
+          applyPayments(s, bonus, opts);
+          effects.push({ type: 'scores', scores: s.players.map((x) => x.score) });
+        }
+        s.riichiSticks = 0;
+        clearIppatsu(s); // 和牌收尾：统一清一发
         s.lastResult = { winners: [...s.agariThisTurn], tenpai: s.players.map((p) => p.log.tenpai) };
         finish(s, effects, 'normal');
         break;

@@ -196,3 +196,33 @@ describe('连庄', () => {
     expect(next.players[0].hand.length).toBe(13); // 已重新配牌
   });
 });
+
+describe('一炮多响的供托/本场归属（頭跳ね：放铳者下家方向最近者）', () => {
+  it('三家荣和时，供托 2 根 + 1 本场都给「离放铳者最近」的 winer，而非先到达者', () => {
+    const s = dummyState();
+    s.riichiSticks = 2;
+    s.round = { wind: 'east', round: 1, honba: 1 };
+    s.dealer = 0;
+    s.players[0].discards = [5];
+    s.lastDiscard = { player: 0, tile: 5 };
+    s.agariThisTurn = [];
+    const opts = {
+      skillsOf: () => [],
+      // 自定义和牌判定：让三家都能和（专注验证供托归属）
+      calcWin: () => ({ han: 1, fu: 30, yaku: ['测试役'], yakuman: [], yakumanTotal: 0, agariPai: 5, winDecomp: null }),
+    } as never;
+    // 故意让「最远的 seat3」最先到达消息（旧实现会把供托给它）
+    let cur = s;
+    for (const seat of [3, 2, 1]) {
+      cur = step(cur, { type: 'ron', player: seat, tile: 5, from: 0 }, opts).state;
+    }
+    const beforePass = cur.players.map((p) => p.score);
+    const r = step(cur, { type: 'pass' }, opts);
+    const gained = r.state.players.map((p, i) => p.score - beforePass[i]);
+    // seat3/seat2 只拿到放铳者的点数（各 1300 - 不算供托），seat1 额外拿 2000 + 300
+    if (!(gained[1] > gained[2] && gained[1] > gained[3])) {
+      throw new Error(`供托应归 seat1（离放铳者最近），实际增益 ${JSON.stringify(gained)}`);
+    }
+    if (r.state.riichiSticks !== 0) throw new Error('立直棒应被收走并清零');
+  });
+});
