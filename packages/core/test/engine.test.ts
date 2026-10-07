@@ -89,6 +89,8 @@ describe('引擎：流局 + 技能三', () => {
     s.players[3].hand = [...NOTEN];
     const before = s.players.map((p) => p.score);
 
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
+
     const r = step(s, { type: 'ryukyoku' }, { skillsOf });
     expect(r.state.phase).toBe('ended');
     expect(r.state.reason).toBe('ryukyoku');

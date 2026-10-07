@@ -78,10 +78,10 @@ export function computePayments(
     }
   }
 
-  // 本场：荣和 300(子)/400(亲)×honba 由放铳者另付；自摸各家另付 100×honba
+  // 本场：荣和一律 300×honba（放铳者付）；自摸各家 100×honba
   if (honba > 0) {
     if (kind === 'ron' && loser != null) {
-      out.push({ from: loser, to: winner, amount: (dealerWin ? 400 : 300) * honba });
+      out.push({ from: loser, to: winner, amount: 300 * honba });
     } else if (kind === 'tsumo') {
       for (let seat = 0; seat < 4; seat++) {
         if (seat === winner) continue;

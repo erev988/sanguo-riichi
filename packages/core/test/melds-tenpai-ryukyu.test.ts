@@ -36,6 +36,7 @@ describe('流局满贯', () => {
       s.players[seat].log.discards = 3;
     }
     const before = s.players.map((p) => p.score);
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
     const r = step(s, { type: 'ryukyoku' }, noSkills());
     // 亲家流局满贯 = 满贯自摸 4000 all → +12000
     expect(r.state.players[0].score - before[0]).toBe(12000);
@@ -47,6 +48,7 @@ describe('流局满贯', () => {
     s.players[0].discards = [1, 9, 11, 19, 21, 29, 31, 32, 33, 34, 35]; // 11 张（有 1 张被鸣）
     s.players[0].log.discards = 12;
     const before = s.players[0].score;
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
     const r = step(s, { type: 'ryukyoku' }, noSkills());
     expect(r.state.players[0].score - before).not.toBe(12000);
   });

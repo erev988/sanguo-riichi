@@ -17,7 +17,6 @@ export const ActionSchema: z.ZodType<Action> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('discard'), tile: TileSchema, riichi: z.boolean().optional() }),
   z.object({ type: z.literal('tsumo') }),
   z.object({ type: z.literal('ron'), player: SeatSchema, tile: TileSchema, from: SeatSchema }),
-  z.object({ type: z.literal('ryukyoku') }),
   z.object({ type: z.literal('kyuushu') }),
   z.object({ type: z.literal('pass') }),
   z.object({ type: z.literal('chii'), player: SeatSchema, tile: TileSchema, tiles: z.tuple([TileSchema, TileSchema]) }),

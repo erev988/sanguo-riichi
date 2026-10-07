@@ -121,6 +121,7 @@ describe('董卓「暴敛」', () => {
     // 董卓听；seat2 也听（但收不到罚符）；seat1/3 不听
     const s = ryukyokuSetup(TENPAI, [NOTEN, TENPAI, NOTEN]);
     const before = s.players.map((p) => p.score);
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
     const r = step(s, { type: 'ryukyoku' }, { skillsOf: BAOLIAN });
     // 董卓 +2000×3 = +6000（基础罚符被屏蔽，无人分得罚符）
     expect(r.state.players[0].score - before[0]).toBe(6000);
@@ -132,6 +133,7 @@ describe('董卓「暴敛」', () => {
   it('董卓听牌：即使全听牌，三家仍各付 2000', () => {
     const s = ryukyokuSetup(TENPAI, [TENPAI, TENPAI, TENPAI]);
     const before = s.players.map((p) => p.score);
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
     const r = step(s, { type: 'ryukyoku' }, { skillsOf: BAOLIAN });
     expect(r.state.players[0].score - before[0]).toBe(6000);
     expect(r.state.players[1].score - before[1]).toBe(-2000);
@@ -143,6 +145,7 @@ describe('董卓「暴敛」', () => {
     // 董卓（亲）不听；seat1 听；seat2/3 不听
     const s = ryukyokuSetup(NOTEN, [TENPAI, NOTEN, NOTEN]);
     const before = s.players.map((p) => p.score);
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
     const r = step(s, { type: 'ryukyoku' }, { skillsOf: BAOLIAN });
     // 基础罚符：亲不听 2000 + 两个子不听各 1000 = 4000 → seat1 收 4000
     // 暴敛额外：董卓付 2000 → seat1 再收 2000
@@ -223,6 +226,7 @@ describe('陈到「往烈」：被鸣走则减少支付', () => {
     s.players[3].hand = [...NOTEN];
     s.players[0].log.calledCount = 1;
     const before = s.players.map((p) => p.score);
+    s.wall = []; // 荒牌流局的合法前提：牌山已耗尽
     const r = step(s, { type: 'ryukyoku' }, { skillsOf: WANGLIE });
     // 亲不听罚符 2000，减 1000 → 实付 1000
     expect(before[0] - r.state.players[0].score).toBe(1000);

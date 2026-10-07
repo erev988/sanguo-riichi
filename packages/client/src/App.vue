@@ -541,7 +541,9 @@ function handleMsg(msg: ServerMsg): void {
       rooms.value = msg.rooms;
       break;
     case 'seedCommit':
-      seedInfo.value = { commit: msg.commit };
+      // 只更新 commit，保留本局的 serverSeed/clientSeeds/salt/verified（否则结算卷轴的
+      // 「牌局指纹」会被下一局的承诺覆盖，导致整局看不到验证结果）
+      seedInfo.value = { ...seedInfo.value, commit: msg.commit };
       sendClientSeed(); // 承诺已锁定 → 贡献本方随机数
       break;
     case 'matching':

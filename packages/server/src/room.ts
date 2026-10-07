@@ -187,6 +187,9 @@ export class Room {
     this.sockets.delete(ws);
     const m = this.members.get(seat);
     if (m) {
+      // ★ 已被新连接接管（复座）→ 旧连接的 close 事件不得回滚新连接的状态，
+      //   否则新连接收不到任何广播、座位被 AI 接管（幽灵会话）
+      if (m.ws !== ws) return;
       m.ws = undefined;
       if (this.started) m.isAI = true; // 断线后由 AI 托管
     }
@@ -223,10 +226,10 @@ export class Room {
       .sort((a, b) => a.seat - b.seat)
       .map((m) => ({ seat: m.seat, name: m.name, isAI: m.isAI, generalId: m.generalId }));
     const info = JSON.stringify({ t: 'room', members, hostSeat: this.hostSeat, started: this.started });
-    for (const m of this.members.values()) m.ws?.send(info);
+    for (const m of this.members.values()) this.safeSend(m.ws, info);
   }
 
-  act(seat: number, action: Action): void {
+  act(seat: number, action: Action, internal = false): void {
     if (!this.state || this.state.phase !== 'playing') return;
     const byPlayer =
       action.type === 'chii' ||
@@ -246,6 +249,11 @@ export class Room {
       action.type === 'kakan' ||
       action.type === 'ankan';
     if (inResponseWindow && !isResponseAction) return;
+    if (!internal && action.type === 'pass') {
+      // ★ 「过」只能由响应窗口内、且非打牌者发出（否则任何人都能替别人关掉窗口）
+      const src = this.state.lastDiscard ?? this.state.pendingKakan;
+      if (!src || seat === src.player) return;
+    }
     if (byPlayer) {
       // 副露/荣和：声明者必须是动作发起人（防冒名）
       if ((action as { player: number }).player !== seat) return;
@@ -253,13 +261,22 @@ export class Room {
       return; // 未轮到的座位不能行动（pass 由服务器内部触发）
     }
     const res = step(this.state, action, { skillsOf: (s) => this.skillsOf(s) });
-    if (!res.error) {
-      // 只有被引擎接受的动作才录进回放
+    if (res.error) {
+      // 非法动作：状态不变，但明确回执给该座位（否则客户端「点了没反应」无从判断）
+      this.safeSend(
+        this.members.get(seat)?.ws,
+        JSON.stringify({ t: 'error', code: 'illegal-action', message: res.error }),
+      );
+      return;
     }
     this.state = res.state;
     this.broadcast(res.effects);
     if (res.state.phase === 'ended') {
       this.stopAI();
+      if (this.lastDeal) {
+        // 本局已结束 → 现在才公开种子与盐，供玩家复算验证整副牌序
+        this.broadcast([{ type: 'seedReveal', ...this.lastDeal }]);
+      }
       this.scheduleNextRound();
     } else if (res.state.lastDiscard || res.state.pendingKakan) {
       this.scheduleResponse();
@@ -272,9 +289,10 @@ export class Room {
   /** 单播给某座位（私有信息） */
   private sendTo(seat: number, effect: GameEffect): void {
     const m = this.members.get(seat);
-    m?.ws?.send(
-      JSON.stringify({ t: 'events', effects: [effect], revision: this.state?.version ?? 0 }),
-    );
+    this.safeSend(
+        m?.ws,
+        JSON.stringify({ t: 'events', effects: [effect], revision: this.state?.version ?? 0 }),
+      );
   }
 
   /**
@@ -300,7 +318,7 @@ export class Room {
       if (!this.state || this.state.phase !== 'playing') return;
       const st = this.state;
       if (st.lastDiscard || st.pendingKakan) {
-        this.act(seat, { type: 'pass' }); // 响应窗口：自动过
+        this.act(seat, { type: 'pass' }, true); // 响应窗口：自动过
       } else if (st.current === seat && st.awaiting === 'discard') {
         const p = st.players[seat];
         const tile = p.hand[p.hand.length - 1]; // 自动摸切（打出刚摸的牌）
@@ -412,6 +430,8 @@ export class Room {
   private seedCommit = '';
   /** 各家贡献的随机数（参与定牌；未提交者由服务器代生成） */
   private clientSeeds = new Map<number, string>();
+  /** 本局定牌信息（服务器持有，仅在本局结束后公开供玩家验证） */
+  private lastDeal?: { serverSeed: string; clientSeeds: string[]; salt: string };
 
   /**
    * 轮换服务器种子并立即公布承诺哈希。
@@ -425,6 +445,16 @@ export class Room {
     this.broadcastSeedCommit();
   }
 
+  /** 安全发送：socket 已断时 ws 库会同步抛错，兜住后按断线处理（否则 uncaughtException 崩服） */
+  private safeSend(ws: WebSocket | undefined | null, payload: string): void {
+    if (!ws) return;
+    try {
+      ws.send(payload);
+    } catch {
+      this.disconnect(ws);
+    }
+  }
+
   private broadcastSeedCommit(): void {
     for (const m of this.members.values()) this.sendSeedCommit(m.ws);
   }
@@ -433,7 +463,7 @@ export class Room {
   private sendSeedCommit(ws: WebSocket | null | undefined): void {
     if (!ws) return;
     try {
-      ws.send(JSON.stringify({ t: 'seedCommit', commit: this.seedCommit }));
+      this.safeSend(ws, JSON.stringify({ t: 'seedCommit', commit: this.seedCommit }));
     } catch {
       /* ignore */
     }
@@ -482,8 +512,9 @@ export class Room {
     this.timedOutPlayers.clear(); // 新局：重置超时标记
     this.broadcastRoom(); // 通知全房间：已开局（含成员/AI 情况）
 
+    // ★ 定牌信息先记录、不广播：局中公开等于把整副牌序送给客户端，必须等本局结束才公开
+    this.lastDeal = { serverSeed, clientSeeds, salt };
     const effects: GameEffect[] = [
-      { type: 'seedReveal', serverSeed, clientSeeds, salt }, // 公开定牌信息，任何人可验证
       { type: 'gameStarted', round: this.state.round, dealer: this.state.dealer, seats: this.seatInfos() },
       { type: 'dora', indicators: this.state.doraIndicators.slice(0, this.state.doraCount) },
       { type: 'wall', count: this.state.wall.length },
@@ -508,7 +539,8 @@ export class Room {
           : [...this.members.values()];
       for (const m of targets) {
         if (!m.ws) continue;
-        m.ws.send(
+        this.safeSend(
+          m.ws,
           JSON.stringify({
             t: 'events',
             effects: [effect],
@@ -531,12 +563,14 @@ export class Room {
     s.rinshanWall = s.rinshanWall.map(() => -1);
     s.uraIndicators = s.uraIndicators.map(() => -1); // 里宝牌指示牌同样保密
     s.seed = ''; // ★ 绝不下发发牌种子：否则客户端可据此推演整副牌（防破解）
+    // ★ 宝牌指示牌：只保留已翻开的 doraCount 张，其余打码（否则可提前知道后续开杠的宝牌）
+    s.doraIndicators = s.doraIndicators.map((t, i) => (i < s.doraCount ? t : -1));
     // ★ 只保留自己的手牌；他人手牌打码为占位（保留张数信息，不泄露内容）
     s.players = s.players.map((p, i) =>
       i === seat ? p : { ...p, hand: p.hand.map(() => -1) },
     );
     const m = this.members.get(seat);
-    m?.ws?.send(JSON.stringify({ t: 'snapshot', state: s }));
+    this.safeSend(m?.ws, JSON.stringify({ t: 'snapshot', state: s }));
     // 快照之后补发当前可选项（断线重连/从后台返回时不会错过 options 广播）
     this.broadcastOptions();
   }
@@ -593,7 +627,7 @@ export class Room {
     const passSeat = st.current;
     this.ronTimer = setTimeout(() => {
       if (!this.state) return;
-      if (this.state.lastDiscard || this.state.pendingKakan) this.act(passSeat, { type: 'pass' });
+      if (this.state.lastDiscard || this.state.pendingKakan) this.act(passSeat, { type: 'pass' }, true);
     }, 400);
   }
 
@@ -609,8 +643,8 @@ export class Room {
       if (next === this.state) return; // 整场结束
       this.state = next;
       this.timedOutPlayers.clear(); // 新局：重置超时标记
+      this.lastDeal = { serverSeed, clientSeeds, salt }; // 同样留到下一局结束再公开
       const effects: GameEffect[] = [
-        { type: 'seedReveal', serverSeed, clientSeeds, salt },
         { type: 'gameStarted', round: next.round, dealer: next.dealer, seats: this.seatInfos() },
         { type: 'dora', indicators: next.doraIndicators.slice(0, next.doraCount) },
         { type: 'wall', count: next.wall.length },

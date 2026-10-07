@@ -345,6 +345,10 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const fromKakan =
         s.pendingKakan && s.pendingKakan.player === action.from && s.pendingKakan.tile === action.tile;
       if (!fromDiscard && !fromKakan) return fail('没有可荣和的牌');
+      // ★ 抢暗杠仅限国士无双（canRon 只是提示层，这里必须复核，否则任意牌形都能抢暗杠）
+      if (fromKakan && s.pendingKakan!.kind === 'ankan' && !isKokushiWin(s.players[winner].hand, action.tile)) {
+        return fail('暗杠只能由国士无双抢');
+      }
       const winnerSkillsR = opts.skillsOf(winner) ?? [];
       const hasForceWinR = winnerSkillsR.some((sk) => sk.forceWin);
       const mayCountSkillHanR = winnerSkillsR.some((sk) => sk.countsAsYaku);
@@ -398,6 +402,9 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
     }
 
     case 'ryukyoku': {
+      // 仅允许在牌山耗尽时荒牌流局（对外的 ryukyoku 动作已从客户端协议移除，
+      // 此处保留校验以防被绕过：牌山还有牌时不得强制流局）
+      if (s.wall.length > 0) return fail('牌山未耗尽，不能荒牌流局');
       return settleRyukyoku(s, opts, effects);
     }
 
@@ -475,6 +482,17 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       s.awaiting = 'discard'; // 副露后直接进入打牌
       clearIppatsu(s); // 鸣牌打断一发
       effects.push({ type: 'called', player: me, from: disc.player, meld, handCount: p.hand.length });
+      // ★ 大明杠：补岭上牌 + 翻开新宝牌（此前遗漏 → 手牌数错乱、永远无法和牌）
+      if (action.type === 'kan') {
+        if (s.rinshanWall.length > 0) {
+          const rinshan = s.rinshanWall.pop()!;
+          p.hand.push(rinshan);
+          s.rinshan = true; // 岭上开花标志
+          effects.push({ type: 'drawn', player: me, tile: rinshan, targetSeat: me });
+        }
+        if (s.doraCount < 5) s.doraCount += 1;
+        effects.push({ type: 'dora', indicators: s.doraIndicators.slice(0, s.doraCount) });
+      }
       effects.push({ type: 'hand', player: me, tiles: [...p.hand], targetSeat: me });
       applyCallSkills(s, opts, me, action.type, effects); // 副露钩子（如「突袭」）
       break;
