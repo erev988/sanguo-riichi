@@ -32,6 +32,10 @@ export interface JoinPayload {
   roomId: string;
   /** 房主可指定规则（首个加入者生效） */
   rules?: Partial<Rules>;
+  /** 会话令牌（断线复座用；由服务器下发，见 welcome.token） */
+  token?: string;
+  /** 房间密码（房主设置了密码时才需要） */
+  password?: string;
 }
 
 const RulesSchema = z

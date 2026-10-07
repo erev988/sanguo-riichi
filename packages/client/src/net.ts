@@ -82,6 +82,11 @@ export class Net {
   }
 
   private scheduleReconnect(): void {
+    // ★ 重试上限：此前无限重试且无出口（服务端长时间不可用时会一直后台重连）
+    if (this.retries >= 15) {
+      this.onReconnecting?.(this.retries, 0); // delay=0 表示放弃（UI 可提示手动重连）
+      return;
+    }
     const delay = Math.min(1000 * 2 ** this.retries, 8000);
     this.retries++;
     this.onReconnecting?.(this.retries, delay);

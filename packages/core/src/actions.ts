@@ -3,7 +3,7 @@ import type { Tile } from './types';
 /**
  * 客户端意图 / 服务器动作。
  * 副露动作带 player（声明者座位），由 step 校验座位关系。
- * 抢杠、加杠（kakan）等留待后续。
+ * 抢杠、加杠（kakan）均已实现（见 engine.ts 的 kakan/ankan 分支）。
  */
 export type Action =
   | { type: 'draw' }

@@ -36,7 +36,6 @@ export interface StepResult {
   error?: string;
 }
 
-const DEFAULT_INITIAL_SCORE = 25000;
 
 /** 宝牌：指示牌 → 实际宝牌（数牌 +1，风 东→南→西→北→东，三元 白→发→中→白） */
 export { doraFromIndicator, countDora, countAka } from './types';

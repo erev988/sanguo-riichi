@@ -459,7 +459,8 @@ function handleEffect(e: GameEffect): void {
       handCounts.value[e.player] = e.handCount;
       const d = [...(discards.value[e.from] ?? [])];
       for (const t of e.meld.tiles) {
-        const idx = d.lastIndexOf(t);
+        // ★ 与服务器保持一致的移除策略（indexOf）：此前用 lastIndexOf，重复牌时河序会瞬时错位
+        const idx = d.indexOf(t);
         if (idx >= 0) {
           d.splice(idx, 1);
           break;
@@ -895,17 +896,7 @@ function discardTile(t: Tile): void {
   riichiMode.value = false;
 }
 
-function ron(): void {
-  const pd = pendingDiscard.value;
-  if (pd == null || mySeat.value == null) return;
-  act({ type: 'ron', player: mySeat.value, tile: pd.tile, from: pd.player });
-  pendingDiscard.value = null;
-}
 
-function pass(): void {
-  act({ type: 'pass' });
-  pendingDiscard.value = null;
-}
 
 watch(soundOn, (v) => {
   sfx.enabled = v;

@@ -227,6 +227,12 @@ export function normalizeSeed(seed?: number | string): string {
 }
 
 /** 由旧种子派生新种子（确定性；128 位不可枚举，用于每局独立发牌） */
+/**
+ * 由旧种子派生新种子。
+ * ⚠️ 注意：派生是链式的 —— 一旦某一局的 seed 被公开，后续各局的牌序都可被推算。
+ *    因此服务器只在**本局结束后**公开 seed（见 Room.lastDeal 的广播时机），
+ *    且 core 层不提供任何「局中公开」的入口。
+ */
 export function deriveSeed(seed: string): string {
   return sha256Hex(`${seed}:next-round`);
 }

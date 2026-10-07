@@ -160,7 +160,7 @@ export class Room {
     const members = [...this.members.values()];
     return {
       id: this.id,
-      humans: members.filter((m) => !m.isAI).length,
+      humans: members.filter((m) => !m.isAI && !!m.ws).length, // 只算在线真人（断线的别显示成「4 真人」）
       ais: members.filter((m) => m.isAI).length,
       started: this.started,
       locked: this.password.length > 0,
@@ -637,10 +637,6 @@ export class Room {
     s.seed = ''; // ★ 绝不下发发牌种子：否则客户端可据此推演整副牌（防破解）
     // ★ 宝牌指示牌：只保留已翻开的 doraCount 张，其余打码（否则可提前知道后续开杠的宝牌）
     s.doraIndicators = s.doraIndicators.map((t, i) => (i < s.doraCount ? t : -1));
-    // ★ 只保留自己的手牌；他人手牌打码为占位（保留张数信息，不泄露内容）
-    s.players = s.players.map((p, i) =>
-      i === seat ? p : { ...p, hand: p.hand.map(() => -1) },
-    );
     const m = this.members.get(seat);
     this.safeSend(m?.ws, JSON.stringify({ t: 'snapshot', state: s }));
     // ★ 重连后重置该座位计时，让 broadcastOptions 重新下发 timer

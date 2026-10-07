@@ -73,11 +73,17 @@ function isYaochuu(t: Tile): boolean {
 
 /** 牌的孤立程度：越小越该打（相邻牌/同牌越少） */
 function isolation(hand: Tile[], t: Tile): number {
+  // ★ 必须判同花色：此前直接用数值差，9m(9) 与 赤5p(10) 差 1 会被误判成「相邻」
+  const norm = (v: Tile): Tile => (v === 0 ? 5 : v === 10 ? 15 : v === 20 ? 25 : v);
+  const suitOf = (v: Tile): number => (v >= 31 ? 3 : Math.floor(v / 10));
+  const numOf = (v: Tile): number => (v >= 31 ? v - 31 : v % 10);
   let rel = 0;
   for (const x of hand) {
     if (x === t) rel += 2;
-    else if (Math.abs(x - t) === 1) rel += 1;
-    else if (Math.abs(x - t) === 2 && Math.floor(x / 10) === Math.floor(t / 10)) rel += 1;
+    else if (suitOf(x) === suitOf(t)) {
+      const d = Math.abs(numOf(norm(x)) - numOf(norm(t)));
+      if (d === 1 || d === 2) rel += 1;
+    }
   }
   return rel;
 }

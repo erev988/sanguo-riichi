@@ -53,6 +53,12 @@ export function replayGame(
   data.rounds.forEach((round, ri) => {
     round.actions.forEach((ra, si) => {
       const r = step(s, ra.action, { skillsOf });
+      if (r.error) {
+        // ★ 此前静默跳过分歧：录像与实际对局不一致时会静默产生错误结果
+        throw new Error(
+          `录像重放失败：第 ${ri + 1} 局第 ${si + 1} 步 ${ra.action.type} — ${r.error}`,
+        );
+      }
       s = r.state;
       onStep?.(s, r.effects, { roundIndex: ri, stepIndex: si });
     });
