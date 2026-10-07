@@ -116,6 +116,62 @@ const dealer = ref(0);
 const timerEnd = ref(0);
 const timerTotal = ref(35000);
 const nowTick = ref(Date.now());
+
+/** 全桌可见的「谁在思考 + 剩余秒」（报告 P1-1/P2-9，由服务端广播 turnTimer） */
+const turnTimerSeat = ref<number | null>(null);
+const turnTimerEnd = ref(0);
+const turnTimerResponse = ref(false);
+const turnTimerTotal = ref(0);
+const turnTimerSec = computed<number | null>(() => {
+  if (turnTimerEnd.value <= 0) return null;
+  const ms = turnTimerEnd.value - nowTick.value;
+  return ms <= 0 ? null : Math.ceil(ms / 1000);
+});
+/** 中央倒计时环的进度（1 → 0） */
+const turnTimerProgress = computed(() => {
+  if (turnTimerEnd.value <= 0 || turnTimerTotal.value <= 0) return 0;
+  return Math.max(0, Math.min(1, (turnTimerEnd.value - nowTick.value) / turnTimerTotal.value));
+});
+let tickTimer: ReturnType<typeof setInterval> | null = null;
+let lastTickSec = 99;
+
+/** 按需运行倒计时 tick：有倒计时才跑，避免无谓的整组件重渲染（报告 P2-3） */
+function startTick(): void {
+  if (tickTimer) return;
+  tickTimer = setInterval(() => {
+    nowTick.value = Date.now();
+    // 最后 5 秒每秒滴答一次
+    const sec = remainSec.value;
+    if (sec != null && sec <= 5 && sec > 0 && sec !== lastTickSec) {
+      lastTickSec = sec;
+      try {
+        sfx.tick(sec <= 2);
+      } catch {
+        /* ignore */
+      }
+    }
+    // 无倒计时且无进行中的动画需求时停掉，省下每 250ms 的重渲染
+    if (timerEnd.value <= 0) stopTick();
+  }, 250);
+}
+
+function stopTick(): void {
+  if (tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = null;
+  }
+}
+
+/** 首次用户手势解锁音频（Safari） */
+function unlockAudioOnce(): void {
+  try {
+    sfx.unlock();
+  } catch {
+    /* ignore */
+  }
+  window.removeEventListener('pointerdown', unlockAudioOnce);
+  window.removeEventListener('keydown', unlockAudioOnce);
+}
 /** 精简模式（默认开）：收起对手牌背与日志，只留牌桌关键信息 */
 /** 日志展开（精简模式下默认收起，只留最新一条） */
 const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
@@ -471,7 +527,16 @@ function handleEffect(e: GameEffect): void {
     case 'wall':
       wallCount.value = e.count;
       break;
+    case 'turnTimer':
+      // 全桌都收到：中央显示「谁在思考」与倒计时环
+      turnTimerSeat.value = e.seat;
+      turnTimerEnd.value = Date.now() + e.ms;
+      turnTimerTotal.value = e.ms;
+      turnTimerResponse.value = !!e.response;
+      startTick();
+      break;
     case 'timer':
+      startTick(); // 有倒计时了 → 启动 tick
       if (e.targetSeat === mySeat.value) {
         timerTotal.value = e.total;
         timerEnd.value = Date.now() + e.ms;
@@ -1028,14 +1093,13 @@ function onResize(): void {
   vw.value = window.innerWidth;
   vh.value = window.innerHeight;
 }
-let tickTimer: ReturnType<typeof setInterval> | null = null;
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', onResize);
   initTabLock();
+  window.addEventListener('pointerdown', unlockAudioOnce, { once: false });
+  window.addEventListener('keydown', unlockAudioOnce, { once: false });
   document.addEventListener('visibilitychange', handleVisibility);
-  tickTimer = setInterval(() => {
-    nowTick.value = Date.now();
-  }, 250);
+  startTick();
 }
 
 onBeforeUnmount(() => {
@@ -1043,7 +1107,7 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', onResize);
     document.removeEventListener('visibilitychange', handleVisibility);
   }
-  if (tickTimer) clearInterval(tickTimer);
+  stopTick();
   net.close();
 });
 </script>
@@ -1191,9 +1255,9 @@ onBeforeUnmount(() => {
             </span>
           </div>
           <div class="row backs">
-            <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
+            <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="tileBackSize" />
           </div>
-          <div class="seat-tag" @click="inspectSeat = seats.top">
+          <div class="seat-tag" :class="{ ai: seatIsAI(seats.top) }" @click="inspectSeat = seats.top">
             <em class="wind">{{ windOf(seats.top) }}</em><em v-if="dealer === seats.top" class="dealer-mark">庄</em>{{ memberName(seats.top) }}<em class="gen">{{ generalNameOf(seats.top) }}</em><span
               v-if="shown.riichi[seats.top]"
               class="riichi"
@@ -1227,7 +1291,7 @@ onBeforeUnmount(() => {
                 :style="{ width: tileBackSize + 'px' }"
               />
             </span>
-            <span class="seat-tag v-tag" @click="inspectSeat = seats.left">
+            <span class="seat-tag v-tag" :class="{ ai: seatIsAI(seats.left) }" @click="inspectSeat = seats.left">
               <em class="wind">{{ windOf(seats.left) }}</em><em v-if="dealer === seats.left" class="dealer-mark">庄</em>{{ memberName(seats.left) }}<em class="gen">{{ generalNameOf(seats.left) }}</em><span
                 v-if="shown.riichi[seats.left]"
                 class="riichi"
@@ -1274,6 +1338,22 @@ onBeforeUnmount(() => {
                 <span class="core-center">
                   <b>{{ shown.roundText }}</b>
                   <i :class="{ low: wallCount < 10 }">剩 {{ wallCount }}</i>
+                  <!-- 中央倒计时 + 等待提示（报告 P1-1/P2-9） -->
+                  <span
+                    v-if="turnTimerSec != null"
+                    class="core-timer"
+                    :class="{ mine: turnTimerSeat === mySeat, low: turnTimerSec <= 5 }"
+                    :style="{ '--p': turnTimerProgress }"
+                  >
+                    {{
+                      turnTimerSeat === mySeat
+                        ? turnTimerResponse
+                          ? '轮到你决定'
+                          : '你的回合'
+                        : (memberName(turnTimerSeat ?? 0) + (turnTimerResponse ? ' 考虑中' : ' 行动中'))
+                    }}
+                    · {{ turnTimerSec }}s
+                  </span>
                 </span>
                 <span class="core-cell" :class="{ active: currentSeat === seats.right }">
                   <em class="w">{{ windOf(seats.right) }}</em>{{ fmtScore(shown.scores[seats.right]) }}
@@ -1315,7 +1395,7 @@ onBeforeUnmount(() => {
         <!-- 下家：竖排 -->
         <section class="seat right" :class="{ turn: shown.current === seats.right }">
           <div class="v-stack">
-            <span class="seat-tag v-tag" @click="inspectSeat = seats.right">
+            <span class="seat-tag v-tag" :class="{ ai: seatIsAI(seats.right) }" @click="inspectSeat = seats.right">
               <em class="wind">{{ windOf(seats.right) }}</em><em v-if="dealer === seats.right" class="dealer-mark">庄</em>{{ memberName(seats.right) }}<em class="gen">{{ generalNameOf(seats.right) }}</em><span
                 v-if="shown.riichi[seats.right]"
                 class="riichi"

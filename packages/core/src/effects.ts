@@ -70,4 +70,12 @@ export type GameEffect =
       salt: string;
     }
   | { type: 'ryukyoku'; tenpai: boolean[]; payments: Payment[]; kind?: 'howanpai' | 'kyuushu' | 'suufon' | 'suukantsu' | 'suuchariichi'; /** 结算后剩余立直棒数（客户端供托显示用） */ riichiSticks?: number }
-  | { type: 'gameEnded'; scores: number[]; reason: 'normal' | 'tobi' | 'ryukyoku' };
+  | { type: 'gameEnded'; scores: number[]; reason: 'normal' | 'tobi' | 'ryukyoku' }
+  | {
+      /** 某人开始决策（广播给全桌）：中央倒计时与「等待其他玩家」提示用，不含任何隐藏信息 */
+      type: 'turnTimer';
+      seat: number;
+      ms: number;
+      /** 是否为响应窗口（要不要吃碰） */
+      response?: boolean;
+    };

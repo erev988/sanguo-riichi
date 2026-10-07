@@ -371,6 +371,8 @@ export class Room {
     const deadline = now + TOTAL;
     this.thinkDeadline.set(seat, deadline);
     this.sendTo(seat, { type: 'timer', seat, ms: TOTAL, total: TOTAL, targetSeat: seat });
+    // ★ 广播给全桌（不含隐藏信息）：中央倒计时 + 「等待其他玩家」提示（报告 P1-1/P2-9）
+    this.broadcast([{ type: 'turnTimer', seat, ms: TOTAL, response: !!opts?.response }]);
     const t = setTimeout(() => {
       this.thinkTimers.delete(seat);
       this.thinkDeadline.delete(seat);

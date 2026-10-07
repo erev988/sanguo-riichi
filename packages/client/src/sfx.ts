@@ -14,8 +14,28 @@ export class Sfx {
       if (!Ctor) return null;
       this.ctx = new Ctor();
     }
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    if (this.ctx.state === 'suspended') void this.ctx.resume().catch(() => undefined);
     return this.ctx;
+  }
+
+  /**
+   * 首次用户手势时解锁音频。
+   * Safari 要求 AudioContext 在手势内创建/恢复，否则整局无声（报告 P2-7）。
+   */
+  unlock(): void {
+    try {
+      const ctx = this.ac();
+      if (ctx && ctx.state === 'suspended') {
+        void ctx.resume().catch(() => undefined);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  /** 倒计时滴答（最后 5 秒，报告 P2-3） */
+  tick(last: boolean): void {
+    this.tone(last ? 1180 : 880, 0.045, 'triangle', 0.05);
   }
 
   /** 单音（可叠泛音/延迟） */

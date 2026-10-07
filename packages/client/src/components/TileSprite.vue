@@ -94,6 +94,10 @@ const w = computed(() => Math.round((h.value * 19) / 26));
 
 /* 牌背 */
 .tile-back {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.055) 0 3px, transparent 3px 6px),
+    linear-gradient(160deg, #4b6b52, #2c4033 60%, #243428);
+  border-radius: 2px;
   display: block;
   position: absolute;
   inset: 0;
