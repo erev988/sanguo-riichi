@@ -103,7 +103,8 @@ export function canRon(
   // 抢暗杠仅限国士无双
   if (fromKakan && s.pendingKakan!.kind === 'ankan' && !isKokushiWin(s.players[seat].hand, tile)) return no;
   const p = s.players[seat];
-  if (!calcTenpai(p.hand).includes(tile)) return no;
+  // ★ 必须用含副露的听牌判定：副露手的听牌不能用纯手牌 14 张模式算
+  if (!calcTenpaiWithMelds(p.hand, p.openMelds).includes(tile)) return no;
   return { ok: !!winFromState(s, seat, 'ron', tile, fromKakan), chankan: fromKakan };
 }
 
@@ -698,7 +699,7 @@ function applyCallSkills(
 function settleRyukyoku(s: GameState, opts: StepOptions, effects: GameEffect[]): StepResult {
   const payments: Payment[] = [];
   // 计算听牌状态（流局罚符与连庄判定都依赖它）
-  const tenpai = s.players.map((p) => calcTenpai(p.hand).length > 0);
+  const tenpai = s.players.map((p) => calcTenpaiWithMelds(p.hand, p.openMelds).length > 0);
   s.players.forEach((p, i) => {
     p.log.tenpai = tenpai[i];
   });

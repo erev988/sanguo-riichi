@@ -187,8 +187,9 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
     };
   }
 
-  // 标准形
-  const decomps = enumerateDecomps([...ctx.juntehai, ctx.agariPai]);
+  // 标准形：副露面子已固定，手牌只需再凑 (4 - 副露数) 个面子 + 1 雀头
+  const needMentsu = Math.max(0, 4 - ctx.fuuro.length);
+  const decomps = enumerateDecomps([...ctx.juntehai, ctx.agariPai], needMentsu);
   if (decomps.length === 0) return null;
   const pinfu = isPinfu(ctx, decomps);
   const yakuCtx = makeYakuContext(ctx, all, c14, decomps, false, false);
@@ -308,7 +309,7 @@ function tileOfSuite(s: number, i: number): Tile {
 }
 
 /** 标准形：14 张 → 全部拆法（不含七对/国士） */
-export function enumerateDecomps(tiles14: Tile[]): WinDecomp[] {
+export function enumerateDecomps(tiles14: Tile[], needMentsu = 4): WinDecomp[] {
   const c = countsOf(tiles14);
   const out: WinDecomp[] = [];
 
@@ -318,7 +319,7 @@ export function enumerateDecomps(tiles14: Tile[]): WinDecomp[] {
     for (let i = 0; i < len; i++) {
       if (c[s][i] >= 2) {
         c[s][i] -= 2;
-        collectMentsu(c, tileOfSuite(s, i), [], out);
+        collectMentsu(c, tileOfSuite(s, i), [], out, needMentsu);
         c[s][i] += 2;
       }
     }
@@ -326,8 +327,14 @@ export function enumerateDecomps(tiles14: Tile[]): WinDecomp[] {
   return out;
 }
 
-function collectMentsu(c: Counts, jantou: Tile, acc: MentsuDecomp[], out: WinDecomp[]): void {
-  if (acc.length === 4) {
+function collectMentsu(
+  c: Counts,
+  jantou: Tile,
+  acc: MentsuDecomp[],
+  out: WinDecomp[],
+  need = 4,
+): void {
+  if (acc.length === need) {
     // 校验全部清零
     for (let s = 0; s < 4; s++) {
       const len = s === 3 ? 7 : 9;
@@ -343,7 +350,7 @@ function collectMentsu(c: Counts, jantou: Tile, acc: MentsuDecomp[], out: WinDec
         if (c[s][i] >= 3) {
           c[s][i] -= 3;
           acc.push({ kind: 'koutsu', anchor: tileOfSuite(s, i) });
-          collectMentsu(c, jantou, acc, out);
+          collectMentsu(c, jantou, acc, out, need);
           acc.pop();
           c[s][i] += 3;
         }
@@ -352,7 +359,7 @@ function collectMentsu(c: Counts, jantou: Tile, acc: MentsuDecomp[], out: WinDec
           c[s][i + 1]--;
           c[s][i + 2]--;
           acc.push({ kind: 'shuntsu', anchor: tileOfSuite(s, i) });
-          collectMentsu(c, jantou, acc, out);
+          collectMentsu(c, jantou, acc, out, need);
           acc.pop();
           c[s][i]++;
           c[s][i + 1]++;
@@ -367,7 +374,7 @@ function collectMentsu(c: Counts, jantou: Tile, acc: MentsuDecomp[], out: WinDec
       if (c[3][i] >= 3) {
         c[3][i] -= 3;
         acc.push({ kind: 'koutsu', anchor: tileOfSuite(3, i) });
-        collectMentsu(c, jantou, acc, out);
+        collectMentsu(c, jantou, acc, out, need);
         acc.pop();
         c[3][i] += 3;
       }

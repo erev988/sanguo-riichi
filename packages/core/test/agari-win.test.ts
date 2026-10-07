@@ -81,9 +81,10 @@ describe('和牌判定 evaluateAgari（agari.ls 转写）', () => {
 
   it('食断：副露 234s 的断幺九（menzen=false）→ 1 番', () => {
     const chii234s: Meld = { type: 'chii', tiles: [22, 23, 24] };
+    // 副露占 1 面子 → 手牌 10 张 + 和牌张 = 11 张，凑 3 面子 + 雀头
     const ctx = makeAgari({
-      juntehai: [3, 4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 17, 5], // 345m678m 234p567p 55m，全中张
-      agariPai: 5,
+      juntehai: [3, 4, 5, 6, 7, 8, 12, 13, 14, 5], // 345m 678m 234p + 5m
+      agariPai: 5, // → 345m 678m 234p + 55m 雀头，全中张
       fuuro: [chii234s],
       menzen: false,
     });
@@ -101,5 +102,78 @@ describe('和牌判定 evaluateAgari（agari.ls 转写）', () => {
     const r = evaluateAgari(ctx);
     expect(r).not.toBeNull();
     expect(r!.yaku.map((y) => y.name)).toEqual(expect.arrayContaining(['役牌·發']));
+  });
+});
+
+describe('副露手的和牌判定（P0-2 回归防线）', () => {
+  const ponHaku: Meld = { type: 'pon', tiles: [35, 35, 35] }; // 碰 白（役牌，保证有役）
+
+  it('碰白 + 123m456m789m + 77p 荣和 7p → 成立且计「役牌·白」', () => {
+    const ctx = makeAgari({
+      juntehai: [1, 2, 3, 4, 5, 6, 7, 8, 9, 17], // 123m456m789m + 7p
+      agariPai: 17, // → 77p 雀头
+      fuuro: [ponHaku],
+      menzen: false,
+      isTsumo: false,
+    });
+    const r = evaluateAgari(ctx);
+    expect(r).not.toBeNull();
+    expect(r!.yaku.map((y) => y.name)).toContain('役牌·白');
+  });
+
+  it('碰白 + 全万子（456m789m111m + 99m）→ 计混一色', () => {
+    const ctx = makeAgari({
+      juntehai: [4, 5, 6, 7, 8, 9, 1, 1, 1, 9],
+      agariPai: 9,
+      fuuro: [ponHaku],
+      menzen: false,
+      isTsumo: true,
+    });
+    const r = evaluateAgari(ctx);
+    expect(r).not.toBeNull();
+    expect(r!.yaku.map((y) => y.name)).toContain('混一色'); // 字牌副露 + 全万子 = 混一色
+  });
+
+  it('两副露（碰白 + 吃 234s）手牌 123m456p 单骑 8m → 成立', () => {
+    const ctx = makeAgari({
+      juntehai: [1, 2, 3, 14, 15, 16, 8], // 123m 456p + 8m
+      agariPai: 8, // → 88m 雀头
+      fuuro: [ponHaku, { type: 'chii', tiles: [22, 23, 24] }],
+      menzen: false,
+      isTsumo: false,
+    });
+    const r = evaluateAgari(ctx);
+    expect(r).not.toBeNull();
+    expect(r!.yaku.map((y) => y.name)).toContain('役牌·白');
+  });
+
+  it('四副露全刻子（含碰白）单骑 → 成立且计对对和', () => {
+    const ctx = makeAgari({
+      juntehai: [1], // 四副露：手牌仅 13-3×4 = 1 张
+      agariPai: 1, // → 11m 雀头
+      fuuro: [
+        ponHaku,
+        { type: 'pon', tiles: [11, 11, 11] },
+        { type: 'pon', tiles: [21, 21, 21] },
+        { type: 'pon', tiles: [25, 25, 25] },
+      ],
+      menzen: false,
+      isTsumo: false,
+    });
+    const r = evaluateAgari(ctx);
+    expect(r).not.toBeNull();
+    const names = r!.yaku.map((y) => y.name);
+    expect(names).toContain('对对和');
+  });
+
+  it('副露后不能构成和牌形时返回 null（12 张手牌 + 1 副露）', () => {
+    const ctx = makeAgari({
+      juntehai: [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 13, 17],
+      agariPai: 17,
+      fuuro: [ponHaku],
+      menzen: false,
+      isTsumo: false,
+    });
+    expect(evaluateAgari(ctx)).toBeNull();
   });
 });
