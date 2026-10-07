@@ -335,9 +335,14 @@ export class Room {
   private sendTo(seat: number, effect: GameEffect): void {
     const m = this.members.get(seat);
     this.safeSend(
-        m?.ws,
-        JSON.stringify({ t: 'events', effects: [effect], revision: this.state?.version ?? 0 }),
-      );
+      m?.ws,
+      JSON.stringify({
+        t: 'events',
+        effects: [effect],
+        revision: this.state?.version ?? 0,
+        current: this.state?.current ?? -1,
+      }),
+    );
   }
 
   /**
@@ -424,11 +429,13 @@ export class Room {
       const realActs = acts.filter((a) => a.type !== 'pass');
       if (realActs.length > 0) {
         // 只下发「实质动作」；仅有 pass 时不打扰玩家（服务器会在无人可动作时自动过）
-        m.ws?.send(
+        this.safeSend(
+          m.ws,
           JSON.stringify({
             t: 'events',
             effects: [{ type: 'options', actions: acts, targetSeat: seat }],
             revision: st.version,
+            current: st.current,
           }),
         );
       }
@@ -619,6 +626,7 @@ export class Room {
             t: 'events',
             effects: [effect],
             revision: this.state.version,
+            current: this.state.current,
           }),
         );
       }

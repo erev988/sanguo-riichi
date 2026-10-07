@@ -10,6 +10,7 @@ import {
   type Tile,
 } from '@sanguo/core';
 import { PROTOCOL_VERSION, type RoomInfo, type ServerMsg } from '@sanguo/shared';
+import { calcTenpaiWithMelds } from '@sanguo/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import TileSprite from './components/TileSprite.vue';
 import { Net } from './net';
@@ -77,12 +78,28 @@ const melds = ref<Meld[][]>([[], [], [], []]);
 const riichiFlags = ref<boolean[]>([false, false, false, false]);
 const riichiDiscardIdx = ref<Record<number, number>>({});
 const currentSeat = ref(-1);
+
+// ---- 视口自适应尺寸（报告 §2.2 的尺寸体系）----
+/** 牌河牌尺寸：桌面 28px / 移动端横屏 20px */
+const tileRiverSize = computed(() => (vw.value < 900 ? 20 : 28));
+/** 对手手牌背面尺寸：桌面 30px / 移动端 22px */
+const tileBackSize = computed(() => (vw.value < 900 ? 22 : 30));
+
+// ---- 最后一张打出的牌（高亮 + 飞牌动画锚点）----
+const lastDiscardSeat = ref<number | null>(null);
+const lastDiscardIdx = ref(-1);
+/** 该位牌是否为「刚打出的牌」（黄铜描边 + 放大 + 上浮） */
+function isLastDiscard(seat: number, i: number): boolean {
+  return lastDiscardSeat.value === seat && lastDiscardIdx.value === i;
+}
 const roundText = ref('');
 const honbaText = ref('');
 /** 本场数（场供 = 本场 × 300） */
 const honba = ref(0);
 const riichiSticks = ref(0);
 const logs = ref<string[]>([]);
+/** 战报条展开态（默认收起只显示最新一条） */
+const logOpenState = ref(false);
 const ended = ref(false);
 const reason = ref('');
 const pendingDiscard = ref<{ player: number; tile: Tile; chankan: boolean } | null>(null);
@@ -241,12 +258,57 @@ function pushToast(text: string, ms = 5000): void {
 
 /** 手牌牌高：**固定按 14 张计算**（不随实际张数变化），并为副露/倒计时预留宽度 */
 const handTileSize = computed(() => {
-  const byWidth = Math.floor((vw.value - 240) / 14); // 预留约 240px 给副露与倒计时
-  const byHeight = Math.floor(vh.value * 0.125);
-  return Math.max(22, Math.min(48, byWidth, byHeight));
+  // ★ 改造：上限 48 → 68px，移动端下限 22 → 36px（报告 P0-3：手牌应占屏高 1/6 以上）
+  const byWidth = Math.floor((vw.value - 150) / 14); // 预留 150px 给副露与倒计时
+  const byHeight = Math.floor(vh.value * 0.2);
+  const min = vw.value < 900 ? 36 : 44;
+  return Math.max(min, Math.min(68, byWidth, byHeight));
 });
 
+/** 选中的手牌下标（-1 表示刚摸的那张；两段式出牌，防移动端误触） */
+const selectedIdx = ref<number | null>(null);
+
+/** 手牌点击：第一下选中（上抬），再点同一张才打出；立直宣言模式下直接打出 */
+function clickHandTile(t: Tile, idx: number): void {
+  if (ended.value) return;
+  if (mySeat.value == null) return;
+  if (currentSeat.value >= 0 && currentSeat.value !== mySeat.value) return;
+  if (riichiMode.value) {
+    act({ type: 'discard', tile: t, riichi: true });
+    riichiMode.value = false;
+    selectedIdx.value = null;
+    return;
+  }
+  if (selectedIdx.value !== idx) {
+    selectedIdx.value = idx; // 第一下：选中
+    return;
+  }
+  act({ type: 'discard', tile: t }); // 第二下：打出
+  selectedIdx.value = null;
+}
+
 /** 风位：庄家为东，逆时针（座位号 +1）依次 南西北 */
+/** 自己的待牌（立直后显示，便于确认是否已听；报告 P2-2） */
+const myTenpai = computed<Tile[]>(() => {
+  const me = mySeat.value;
+  if (me == null) return [];
+  if (!shown.value.riichi[me]) return []; // 仅立直后提示，避免「无脑打法」
+  const h = shown.value.hands[me] ?? [];
+  const base = h.length === 14 ? h.slice(0, 13) : h;
+  if (base.length !== 13) return [];
+  return calcTenpaiWithMelds(base, shown.value.melds[me] ?? []);
+});
+
+/** 该座位是否是 AI（用于名字灰化，报告 P2-8） */
+function seatIsAI(seat: number): boolean {
+  return roomMembers.value.find((m) => m.seat === seat)?.isAI ?? false;
+}
+
+/** 点数千分位显示（报告 P1-1） */
+function fmtScore(n: number): string {
+  return (n ?? 0).toLocaleString('en-US');
+}
+
 function windOf(seat: number): string {
   return ['东', '南', '西', '北'][(((seat - dealer.value) % 4) + 4) % 4];
 }
@@ -422,6 +484,9 @@ function handleEffect(e: GameEffect): void {
       // ★ 自己（可能被超时自动摸切）打牌后，立直宣言模式必须清除，
       //   否则下一巡点任意牌都会带 riichi 标志（不听则整次被拒，听则被迫立直扣 1000）
       if (e.player === mySeat.value) riichiMode.value = false;
+      // 记录「刚打出的牌」用于高亮（本侧河末尾那张）
+      lastDiscardSeat.value = e.player;
+      lastDiscardIdx.value = (shown.value.discards[e.player] ?? []).length - 1;
       const d = [...(discards.value[e.player] ?? []), e.tile];
       discards.value[e.player] = d;
       handCounts.value[e.player] = e.handCount;
@@ -441,6 +506,8 @@ function handleEffect(e: GameEffect): void {
       break;
     }
     case 'called': {
+      // 被鸣走 → 已不在牌河里，清除高亮
+      if (lastDiscardSeat.value === e.from) lastDiscardSeat.value = null;
       // ★ 加杠（kakan）是对已有「碰」的升级：必须替换，不能追加（否则显示 3+4=7 张）
       if (e.meld.type === 'kakan') {
         const list = [...(melds.value[e.player] ?? [])];
@@ -504,6 +571,7 @@ function handleEffect(e: GameEffect): void {
     }
     case 'passed':
       myOptions.value = []; // ★ 窗口已关（可能是别人 pass 关掉的），清掉残留按钮
+      lastDiscardSeat.value = null; // 窗口关闭后不再是「刚打出的牌」
       pendingDiscard.value = null;
       break;
     case 'scores':
@@ -623,6 +691,9 @@ function handleMsg(msg: ServerMsg): void {
         msg.waiting >= 4 ? '匹配成功，进入对局…' : `正在匹配…（${msg.waiting}/4 名真人）`;
       break;
     case 'events':
+      // ★ 服务器每条 events 都带 current：据此更新行动家
+      //   （此前 currentSeat 只在快照时更新 → 常年 -1，导致行动家高亮失效、出牌被门控拦掉）
+      if (typeof msg.current === 'number') currentSeat.value = msg.current;
       for (const e of msg.effects) handleEffect(e);
       break;
     case 'snapshot': {
@@ -842,6 +913,18 @@ function act(action: Action): void {
 }
 
 /** 按钮文案 */
+/** 按钮内嵌的牌面预览（报告 P0-4：吃碰杠显示相关牌组，比纯文字快得多） */
+function optionTiles(a: Action): Tile[] {
+  const anyA = a as unknown as { tile?: Tile; tiles?: Tile[] };
+  if (a.type === 'chii') return [...(anyA.tiles ?? []), anyA.tile].filter((t): t is Tile => t != null);
+  if (a.type === 'pon') return anyA.tile != null ? [anyA.tile, anyA.tile] : [];
+  if (a.type === 'kan' || a.type === 'ankan' || a.type === 'kakan') {
+    return anyA.tile != null ? [anyA.tile, anyA.tile, anyA.tile] : [];
+  }
+  if (a.type === 'ron') return anyA.tile != null ? [anyA.tile] : [];
+  return [];
+}
+
 function optionLabel(a: Action): string {
   switch (a.type) {
     case 'tsumo':
@@ -900,9 +983,10 @@ const canRiichiNow = computed(() => {
 
 function discardTile(t: Tile): void {
   if (ended.value) return;
-  // ★ 行动门控：只有轮到自己时点手牌才有效
-  //   （此前非自己回合点击会静默失败，还会误消耗立直宣言模式）
-  if (mySeat.value == null || currentSeat.value !== mySeat.value) return;
+  // ★ 行动门控：只有轮到自己时点手牌才有效（非自己回合点击会静默失败且误消耗立直宣言模式）
+  //   兜底：若 current 未知（<0，例如尚未收到任何 events），不阻止——宁可放行也不卡住玩家
+  if (mySeat.value == null) return;
+  if (currentSeat.value >= 0 && currentSeat.value !== mySeat.value) return;
   act({ type: 'discard', tile: t, riichi: riichiMode.value });
   riichiMode.value = false;
 }
@@ -1085,6 +1169,14 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
+        <!-- 战报条（报告 P1-4：logs 数据早已存在但模板零渲染，错误与吃碰杠全无处可见） -->
+        <div v-if="logs.length" class="log-bar" @click="logOpenState = !logOpenState">
+          <span class="log-line">📜 {{ logs[0] }}</span>
+          <div v-if="logOpenState" class="log-list">
+            <div v-for="(l, i) in logs.slice(0, 20)" :key="i">{{ l }}</div>
+          </div>
+        </div>
+
         <!-- 对家：横排，整体居中 -->
         <section class="seat top" :class="{ turn: shown.current === seats.top }">
           <div class="row melds">
@@ -1102,7 +1194,7 @@ onBeforeUnmount(() => {
             <TileSprite v-for="i in shown.handCounts[seats.top]" :key="i" back :size="18" />
           </div>
           <div class="seat-tag" @click="inspectSeat = seats.top">
-            <em class="wind">{{ windOf(seats.top) }}</em>{{ memberName(seats.top) }}<em class="gen">{{ generalNameOf(seats.top) }}</em><span
+            <em class="wind">{{ windOf(seats.top) }}</em><em v-if="dealer === seats.top" class="dealer-mark">庄</em>{{ memberName(seats.top) }}<em class="gen">{{ generalNameOf(seats.top) }}</em><span
               v-if="shown.riichi[seats.top]"
               class="riichi"
             >
@@ -1126,11 +1218,17 @@ onBeforeUnmount(() => {
                 />
               </span>
             </span>
-            <span class="v-backs">
-              <i v-for="i in shown.handCounts[seats.left]" :key="i" class="back-v" />
+            <!-- ★ 侧家：真实牌背竖排（此前是 22×6 的绿色细条，完全没有麻将质感） -->
+            <span class="backs-v">
+              <i
+                v-for="i in shown.handCounts[seats.left]"
+                :key="i"
+                class="back back-side"
+                :style="{ width: tileBackSize + 'px' }"
+              />
             </span>
             <span class="seat-tag v-tag" @click="inspectSeat = seats.left">
-              <em class="wind">{{ windOf(seats.left) }}</em>{{ memberName(seats.left) }}<em class="gen">{{ generalNameOf(seats.left) }}</em><span
+              <em class="wind">{{ windOf(seats.left) }}</em><em v-if="dealer === seats.left" class="dealer-mark">庄</em>{{ memberName(seats.left) }}<em class="gen">{{ generalNameOf(seats.left) }}</em><span
                 v-if="shown.riichi[seats.left]"
                 class="riichi"
               >
@@ -1142,65 +1240,73 @@ onBeforeUnmount(() => {
 
         <!-- 中央：方块（点数 + 风位）四周环绕牌河 -->
         <section class="center">
-          <div class="river-top">
+          <div class="river-top river-grid">
             <TileSprite
               v-for="(t, i) in shown.discards[seats.top]"
               :key="i"
               :tile="t"
               :rotated="shown.riichiDiscardIdx[seats.top] === i"
-              :size="18"
+              :size="tileRiverSize"
+              :class="{ last: isLastDiscard(seats.top, i) }"
               dim
             />
           </div>
           <div class="river-mid">
-            <div class="river-left">
+            <div class="river-left river-grid-v">
               <TileSprite
                 v-for="(t, i) in shown.discards[seats.left]"
                 :key="i"
                 :tile="t"
-                :rotated="shown.riichiDiscardIdx[seats.left] !== i"
-                :size="18"
+                :rotated="shown.riichiDiscardIdx[seats.left] === i"
+                :size="tileRiverSize"
+                :class="{ last: isLastDiscard(seats.left, i) }"
                 dim
               />
             </div>
             <div class="core">
-              <span class="core-cell">
-                <em class="w">{{ windOf(seats.top) }}</em>{{ shown.scores[seats.top] }}
+              <span class="core-cell" :class="{ active: currentSeat === seats.top }">
+                <em class="w">{{ windOf(seats.top) }}</em>{{ fmtScore(shown.scores[seats.top]) }}
               </span>
               <span class="core-row">
-                <span class="core-cell">
-                  <em class="w">{{ windOf(seats.left) }}</em>{{ shown.scores[seats.left] }}
+                <span class="core-cell" :class="{ active: currentSeat === seats.left }">
+                  <em class="w">{{ windOf(seats.left) }}</em>{{ fmtScore(shown.scores[seats.left]) }}
                 </span>
                 <span class="core-center">
                   <b>{{ shown.roundText }}</b>
-                  <i>剩 {{ wallCount }}</i>
+                  <i :class="{ low: wallCount < 10 }">剩 {{ wallCount }}</i>
                 </span>
-                <span class="core-cell">
-                  <em class="w">{{ windOf(seats.right) }}</em>{{ shown.scores[seats.right] }}
+                <span class="core-cell" :class="{ active: currentSeat === seats.right }">
+                  <em class="w">{{ windOf(seats.right) }}</em>{{ fmtScore(shown.scores[seats.right]) }}
                 </span>
               </span>
-              <span class="core-cell me">
-                <em class="w">{{ windOf(seats.self) }}</em>{{ shown.scores[seats.self] }}
+              <span class="core-cell me" :class="{ active: currentSeat === seats.self }">
+                <em class="w">{{ windOf(seats.self) }}</em>{{ fmtScore(shown.scores[seats.self]) }}
               </span>
             </div>
-            <div class="river-right">
+            <div class="river-right river-grid-v">
               <TileSprite
                 v-for="(t, i) in shown.discards[seats.right]"
                 :key="i"
                 :tile="t"
-                :rotated="shown.riichiDiscardIdx[seats.right] !== i"
-                :size="18"
+                :rotated="shown.riichiDiscardIdx[seats.right] === i"
+                :size="tileRiverSize"
+                :class="{ last: isLastDiscard(seats.right, i) }"
                 dim
               />
             </div>
           </div>
-          <div class="river-bottom">
+          <!-- 立直棒实体化（报告 P1-3）：每根 1000 点，摆在自家河前方 -->
+          <div v-if="shown.riichiSticks > 0" class="riichi-sticks">
+            <i v-for="i in Math.min(shown.riichiSticks, 8)" :key="i" class="stick" />
+          </div>
+          <div class="river-bottom river-grid">
             <TileSprite
               v-for="(t, i) in shown.discards[seats.self]"
               :key="i"
               :tile="t"
               :rotated="shown.riichiDiscardIdx[seats.self] === i"
-              :size="18"
+              :size="tileRiverSize"
+              :class="{ last: isLastDiscard(seats.self, i) }"
               dim
             />
           </div>
@@ -1210,7 +1316,7 @@ onBeforeUnmount(() => {
         <section class="seat right" :class="{ turn: shown.current === seats.right }">
           <div class="v-stack">
             <span class="seat-tag v-tag" @click="inspectSeat = seats.right">
-              <em class="wind">{{ windOf(seats.right) }}</em>{{ memberName(seats.right) }}<em class="gen">{{ generalNameOf(seats.right) }}</em><span
+              <em class="wind">{{ windOf(seats.right) }}</em><em v-if="dealer === seats.right" class="dealer-mark">庄</em>{{ memberName(seats.right) }}<em class="gen">{{ generalNameOf(seats.right) }}</em><span
                 v-if="shown.riichi[seats.right]"
                 class="riichi"
               >
@@ -1218,7 +1324,12 @@ onBeforeUnmount(() => {
               >
             </span>
             <span class="v-backs">
-              <i v-for="i in shown.handCounts[seats.right]" :key="i" class="back-v" />
+              <i
+                v-for="i in shown.handCounts[seats.right]"
+                :key="i"
+                class="back back-side"
+                :style="{ width: tileBackSize + 'px' }"
+              />
             </span>
             <span class="v-melds">
               <span v-for="(m, i) in shown.melds[seats.right]" :key="i" class="v-meld-group">
@@ -1251,10 +1362,16 @@ onBeforeUnmount(() => {
               :class="{ ron: a.type === 'ron', strong: a.type === 'tsumo' }"
               @click="doOption(a)"
             >
+              <span v-if="optionTiles(a).length" class="btn-tiles">
+                <TileSprite v-for="(t, j) in optionTiles(a)" :key="j" :tile="t" :size="14" />
+              </span>
               {{ optionLabel(a) }}
             </button>
           </div>
           <div class="hand-layer">
+            <span v-if="myTenpai.length > 0" class="tenpai-tip">
+              听牌 {{ myTenpai.map((t) => tileName(t)).join(' ') }}
+            </span>
             <span v-if="shown.melds[seats.self].length > 0" class="hand-melds">
               <span v-for="(m, i) in shown.melds[seats.self]" :key="i" class="meld-group">
                 <TileSprite
@@ -1272,14 +1389,16 @@ onBeforeUnmount(() => {
                 :key="i"
                 :tile="t"
                 :size="handTileSize"
-                @click="discardTile(t)"
+                :class="{ selected: selectedIdx === i, riichi: riichiMode }"
+                @click="clickHandTile(t, i)"
               />
               <TileSprite
                 v-if="shown.lastDrawn != null"
                 class="just-drawn"
+                :class="{ selected: selectedIdx === -1, riichi: riichiMode }"
                 :tile="shown.lastDrawn"
                 :size="handTileSize"
-                @click="discardTile(shown.lastDrawn)"
+                @click="clickHandTile(shown.lastDrawn, -1)"
               />
             </span>
             <span v-if="remainSec !== null" class="timer" :class="{ urgent: inExtraTime }">
@@ -1316,6 +1435,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="scroll-body">
           <template v-if="result.type === 'agaru'">
+            <div v-if="result.detail" class="score-big">{{ result.detail }}</div>
             <div class="yaku-line">
               <span v-for="(y, i) in result.yaku" :key="i" class="yaku-tag">{{ y }}</span>
             </div>

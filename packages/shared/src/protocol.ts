@@ -148,7 +148,7 @@ export type ServerMsg =
   | { t: 'matching'; waiting: number }
   /** 服务器对本局种子（+盐）的承诺哈希：开局前公布，局后可用公开值验证未被篡改 */
   | { t: 'seedCommit'; commit: string }
-  | { t: 'events'; effects: GameEffect[]; revision: number }
+  | { t: 'events'; effects: GameEffect[]; revision: number; /** 当前行动家座位（客户端据此高亮与放行出牌） */ current?: number }
   | { t: 'snapshot'; state: GameState }
   | { t: 'error'; code: string; /** 人类可读的补充说明（如非法动作的具体原因） */ message?: string; seq?: number }
   | { t: 'pong' };

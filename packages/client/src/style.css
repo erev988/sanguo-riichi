@@ -1785,3 +1785,321 @@ textarea {
   line-height: 1;
   padding: 2px 6px;
 }
+
+/* ============================================================================
+   前端改造 v2（对齐雀魂体验 · 报告 §2）
+   —— 以下为后定义规则，覆盖上方旧版；旧规则将在后续样式拆分时清理
+   ========================================================================== */
+
+:root {
+  /* 牌尺寸体系（§2.2）：全局只调这三个变量 */
+  --tile-hand: 68px;
+  --tile-river: 28px;
+  --tile-mini: 30px;
+  --back-h: 30px;
+  --back-w: 22px;
+  --river-cols: 6;
+  --river-rows: 6;
+  --brass: #c9a227;
+}
+
+@media (max-width: 900px), (max-height: 520px) {
+  :root {
+    --tile-hand: 44px;
+    --tile-river: 20px;
+    --tile-mini: 22px;
+    --back-h: 22px;
+    --back-w: 16px;
+  }
+}
+
+/* ---------- 牌河：固定网格，永不裁剪（§2.4：每侧上限 ~20 张，24 格足够）---------- */
+.river-top,
+.river-bottom,
+.river-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--river-cols), auto);
+  grid-auto-rows: auto;
+  gap: 2px;
+  justify-content: center;
+  align-content: flex-start;
+  max-height: none;
+  overflow: visible;
+  padding: 2px;
+}
+
+/* 对家河：自右向左（坐在他对面读到的顺序） */
+.river-top {
+  direction: rtl;
+}
+.river-top > * {
+  direction: ltr;
+}
+
+/* 自家河：自左向右（默认） */
+.river-bottom {
+  direction: ltr;
+}
+
+/* 侧河：6 行 × 4 列，列方向递增 */
+.river-left,
+.river-right,
+.river-grid-v {
+  display: grid;
+  grid-template-rows: repeat(var(--river-rows), auto);
+  grid-auto-flow: column;
+  gap: 2px;
+  align-content: center;
+  justify-content: center;
+  max-height: none;
+  overflow: visible;
+  padding: 2px;
+}
+
+/* 上家河：自上而下、列向右增长 */
+.river-left {
+  direction: ltr;
+}
+
+/* 下家河：自下而上（列反向） */
+.river-right {
+  direction: rtl;
+}
+.river-right > * {
+  direction: ltr;
+}
+
+/* ---------- 刚打出的牌：黄铜描边 + 放大上浮 + 落牌动画 ---------- */
+.tile.last {
+  outline: 2px solid var(--brass);
+  outline-offset: -1px;
+  border-radius: 3px;
+  transform: translateY(-3px) scale(1.16);
+  z-index: 3;
+  animation: tile-drop 200ms ease-out;
+}
+
+@keyframes tile-drop {
+  from {
+    opacity: 0.35;
+    transform: translateY(-16px) scale(1.02);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.16);
+  }
+}
+
+/* ---------- 对手手牌背面：真实牌背（纹理 + 边框），不再是色块/细条 ---------- */
+.back {
+  display: block;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.055) 0 3px, transparent 3px 6px),
+    linear-gradient(160deg, #4b6b52, #2c4033 60%, #243428);
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px rgba(233, 226, 211, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* 对家：横排 */
+.backs-h {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+}
+.backs-h .back {
+  width: var(--back-w);
+  height: var(--back-h);
+}
+
+/* 侧家：竖排（相当于牌背旋转 90°） */
+.backs-v {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+.backs-v .back-side {
+  height: 17px;
+}
+
+/* ---------- 旧版绿条牌背（已废弃，保留规则以防其他位置引用）---------- */
+.back-v {
+  display: none;
+}
+
+/* ---------- 出牌两段式：选中态上抬（§2.6）---------- */
+.hand-tiles .tile.selected {
+  transform: translateY(-12px);
+  filter: brightness(1.1) drop-shadow(0 6px 6px rgba(0, 0, 0, 0.55));
+}
+
+/* 立直宣言模式下，手牌用朱砂描边提示「点哪张宣言」 */
+.hand-tiles .tile.riichi {
+  outline: 1.5px dashed #a4352c;
+  outline-offset: -1px;
+}
+
+/* ---------- 操作按钮浮层（§2.6 / P0-4）：不再被裁，带牌面预览 ---------- */
+.controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  overflow: visible;
+  height: auto;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: rgba(23, 21, 15, 0.6);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(201, 162, 39, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.controls button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 14px;
+  padding: 6px 12px;
+  min-height: 34px;
+}
+
+.controls .btn-tiles {
+  display: inline-flex;
+  gap: 1px;
+}
+
+/* ---------- 中央方块：当前行动家高亮（P1-1）---------- */
+.core-cell.active {
+  background: var(--brass);
+  color: #17150f;
+  font-weight: 800;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(23, 21, 15, 0.35), 0 0 12px rgba(201, 162, 39, 0.5);
+}
+
+.core-cell.active .w {
+  color: #5a3f10;
+}
+
+/* ---------- 战报条（P1-4）：默认收起只显最新一条，点击展开 ---------- */
+.log-bar {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: 62%;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(23, 21, 15, 0.62);
+  border: 1px solid rgba(201, 162, 39, 0.22);
+  color: #e9e2d3;
+  font-size: 12px;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+}
+
+.log-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 60vw;
+}
+
+.log-list {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(233, 226, 211, 0.2);
+  max-height: 30vh;
+  overflow-y: auto;
+  line-height: 1.7;
+  color: #cfc6b4;
+}
+
+/* ---------- 听牌提示（P2-2）：立直后显示待牌 ---------- */
+.tenpai-tip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 4px);
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: rgba(164, 53, 44, 0.85);
+  color: #f7f1e3;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---------- 庄家徽标（P2-8）---------- */
+.dealer-mark {
+  display: inline-block;
+  margin: 0 3px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--brass);
+  color: #17150f;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 15px;
+}
+
+/* AI 名字灰化 */
+.seat-tag.ai .name {
+  color: #9a9384;
+}
+
+/* ---------- 残牌警示（P2-1）：少于 10 张变朱砂 ---------- */
+.core-center i.low {
+  color: #d4645a;
+  font-weight: 800;
+}
+
+/* ---------- 结算：得点大字（P1-2）---------- */
+.score-big {
+  margin: 4px 0 8px;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: #a4352c;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 立直棒实体化（P1-3）---------- */
+.riichi-sticks {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+  padding: 2px 0;
+}
+
+.riichi-sticks .stick {
+  display: block;
+  width: 42px;
+  height: 7px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #fbf7ee, #d8d0c0);
+  box-shadow:
+    inset 0 0 0 1px rgba(23, 21, 15, 0.25),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+  position: relative;
+}
+
+.riichi-sticks .stick::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  top: 1.5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #a4352c;
+}
