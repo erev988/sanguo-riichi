@@ -1752,3 +1752,18 @@ textarea {
   font-size: 11px;
   line-height: 1.6;
 }
+
+/* ---------- 侧家副露：显示全部牌（竖排分组，组间留白） ---------- */
+.v-meld-group {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-right: 3px;
+  padding-right: 3px;
+  border-right: 1px dashed rgba(75, 58, 36, 0.3);
+}
+
+.v-meld-group:last-child {
+  border-right: none;
+  padding-right: 0;
+}

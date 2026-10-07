@@ -1095,13 +1095,16 @@ onBeforeUnmount(() => {
         <section class="seat left" :class="{ turn: shown.current === seats.left }">
           <div class="v-stack">
             <span class="v-melds">
-              <TileSprite
-                v-for="(m, i) in shown.melds[seats.left]"
-                :key="i"
-                :tile="m.tiles[0]"
-                :rotated="true"
-                :size="18"
-              />
+              <!-- ★ 显示副露的全部牌（此前只显示每组首牌，看不出侧家吃了/碰了什么） -->
+              <span v-for="(m, i) in shown.melds[seats.left]" :key="i" class="v-meld-group">
+                <TileSprite
+                  v-for="(t, j) in m.tiles"
+                  :key="j"
+                  :tile="t"
+                  :rotated="true"
+                  :size="16"
+                />
+              </span>
             </span>
             <span class="v-backs">
               <i v-for="i in shown.handCounts[seats.left]" :key="i" class="back-v" />
@@ -1198,13 +1201,15 @@ onBeforeUnmount(() => {
               <i v-for="i in shown.handCounts[seats.right]" :key="i" class="back-v" />
             </span>
             <span class="v-melds">
-              <TileSprite
-                v-for="(m, i) in shown.melds[seats.right]"
-                :key="i"
-                :tile="m.tiles[0]"
-                :rotated="true"
-                :size="18"
-              />
+              <span v-for="(m, i) in shown.melds[seats.right]" :key="i" class="v-meld-group">
+                <TileSprite
+                  v-for="(t, j) in m.tiles"
+                  :key="j"
+                  :tile="t"
+                  :rotated="true"
+                  :size="16"
+                />
+              </span>
             </span>
           </div>
         </section>
