@@ -57,7 +57,7 @@ function tryMatch(): void {
     group.forEach((w) => {
       try {
         // 第 4 个人入座即触发开局（4 名真人，不补 AI）
-        const { seat, started } = room.join(w.ws, w.name, w.generalId);
+        const { seat, started, token } = room.join(w.ws, w.name, w.generalId);
         w.ws.send(
           JSON.stringify({
             t: 'welcome',
@@ -66,6 +66,7 @@ function tryMatch(): void {
             started,
             protocolVersion: PROTOCOL_VERSION,
             rules: room.rules,
+            token, // 服务器下发的会话令牌（复座用）
           }),
         );
       } catch {
@@ -94,7 +95,7 @@ wss.on('connection', (ws: WebSocket) => {
           rooms.set(roomId, room);
         }
         try {
-          const { seat, started, rejoined } = room.join(ws, name, generalId, rules, token, password);
+          const { seat, started, rejoined, token: newToken } = room.join(ws, name, generalId, rules, token, password);
           ws.send(
             JSON.stringify({
               t: 'welcome',
@@ -104,6 +105,7 @@ wss.on('connection', (ws: WebSocket) => {
               protocolVersion: PROTOCOL_VERSION,
               rules: room.rules, // 房间规则（房主指定，含切上满贯等）
               rejoined,
+              token: newToken, // 复座后换发的令牌
             }),
           );
         } catch (e) {

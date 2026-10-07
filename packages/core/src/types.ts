@@ -72,6 +72,8 @@ export interface PlayerLog {
   discardTiles: Tile[];
   /** 本局被鸣走（被吃/碰/杠）的牌数（陈到「往烈」依赖） */
   calledCount: number;
+  /** 本巡放弃过荣和（同巡振听触发条件） */
+  furitenTurn?: number;
   riichi: boolean;
   /** 一发有效（立直后一巡内，无鸣牌打断） */
   ippatsu: boolean;
@@ -79,8 +81,7 @@ export interface PlayerLog {
   doubleRiichi?: boolean;
   /** 先制立直（场上第一个立直） */
   firstRiichi?: boolean;
-  /** 立直宣言时的听牌集合（立直后暗杠/加杠需保持不变听牌） */
-  riichiTenpai?: Tile[];
+  /** 立直宣言时的听牌集合（立直后暗杠/加杠需保持不变听牌） */  riichiTenpai?: Tile[];
   /** 流局时是否听牌（由和牌判定给出） */
   tenpai: boolean;
 }

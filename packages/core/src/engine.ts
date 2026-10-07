@@ -103,9 +103,24 @@ export function canRon(
   // 抢暗杠仅限国士无双
   if (fromKakan && s.pendingKakan!.kind === 'ankan' && !isKokushiWin(s.players[seat].hand, tile)) return no;
   const p = s.players[seat];
+  // ★ 振听：不能荣和自己打过的牌 / 本巡已放弃过的牌
+  if (isFuriten(s, seat, tile)) return no;
   // ★ 必须用含副露的听牌判定：副露手的听牌不能用纯手牌 14 张模式算
   if (!calcTenpaiWithMelds(p.hand, p.openMelds).includes(tile)) return no;
   return { ok: !!winFromState(s, seat, 'ron', tile, fromKakan), chankan: fromKakan };
+}
+
+/**
+ * 振听判定（日麻核心规则）：
+ * - 舍牌振听：自己的弃牌里含要和的牌
+ * - 同巡振听：本巡曾放弃荣和（pass）
+ * - 立直后振听：立直后自己的弃牌含当前听牌张（用舍牌振听覆盖同一效果）
+ */
+export function isFuriten(s: GameState, seat: number, tile: Tile): boolean {
+  const p = s.players[seat];
+  if (p.discards.includes(tile)) return true;
+  if (p.log.furitenTurn != null && p.log.furitenTurn === s.turnCount) return true;
+  return false;
 }
 
 /** 手牌 + tile 是否国士无双和牌形 */
@@ -250,6 +265,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
         }
         // 打出该牌后（手牌 13 张）必须听牌
         if (calcTenpai(p.hand).length === 0) return fail('立直宣言必须听牌');
+        if (p.score < 1000) return fail('点数不足 1000，不能立直');
         const othersRiichi = s.players.some((x, i) => i !== s.current && x.log.riichi);
         p.log.riichi = true;
         p.log.ippatsu = true; // 一发有效，直到轮回自己摸牌或被鸣牌打断
@@ -346,6 +362,8 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       const fromKakan =
         s.pendingKakan && s.pendingKakan.player === action.from && s.pendingKakan.tile === action.tile;
       if (!fromDiscard && !fromKakan) return fail('没有可荣和的牌');
+      // ★ 振听复核（canRon 只是提示层）
+      if (isFuriten(s, winner, action.tile)) return fail('振听，不能荣和');
       // ★ 抢暗杠仅限国士无双（canRon 只是提示层，这里必须复核，否则任意牌形都能抢暗杠）
       if (fromKakan && s.pendingKakan!.kind === 'ankan' && !isKokushiWin(s.players[winner].hand, action.tile)) {
         return fail('暗杠只能由国士无双抢');
@@ -400,6 +418,8 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       s.lastDiscard = undefined;
       effects.push({ type: 'passed' });
       break;
+      // ★ 同巡振听：本巡放弃过荣和，则本巡内不得再和
+      s.players[s.current].log.furitenTurn = s.turnCount;
     }
 
     case 'ryukyoku': {

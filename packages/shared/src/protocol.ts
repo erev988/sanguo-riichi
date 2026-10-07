@@ -132,6 +132,8 @@ export type ServerMsg =
       rejoined?: boolean;
       /** 是否为本次创建的房间 */
       created?: boolean;
+      /** 服务器下发的会话令牌（CSPRNG 生成，用于断线复座；客户端需保存） */
+      token?: string;
     }
   /** 房间成员状态（供大厅显示人数/AI 数、开始按钮） */
   | { t: 'room'; members: RoomMemberInfo[]; hostSeat: number; started: boolean }

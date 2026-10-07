@@ -84,7 +84,7 @@ export class Room {
     rules?: Partial<Rules>,
     token?: string,
     password?: string,
-  ): { seat: number; started: boolean; rejoined: boolean } {
+  ): { seat: number; started: boolean; rejoined: boolean; token: string } {
     // 断线重连：token 命中 → 恢复原座位（免密码）
     if (token) {
       const seat = this.tokens.get(token);
@@ -104,7 +104,11 @@ export class Room {
           this.broadcastRoom();
           this.sendSeedCommit(ws); // 重连也补发当前种子承诺
           this.scheduleAI();
-          return { seat, started: this.started, rejoined: true };
+          // ★ 复座换发新 token（旧 token 立即作废，避免泄露后被复用）
+          if (token) this.tokens.delete(token);
+          const fresh = randomBytes(24).toString('base64url');
+          this.tokens.set(fresh, seat);
+          return { seat, started: this.started, rejoined: true, token: fresh };
         }
       }
     }
@@ -124,11 +128,13 @@ export class Room {
 
     this.members.set(seat, { seat, name, generalId: general.id, isAI: false, ws });
     this.sockets.set(ws, seat);
-    if (token) this.tokens.set(token, seat);
+    // ★ 会话令牌由服务器用 CSPRNG 生成（客户端自选的弱 token 可被猜中并抢座）
+    const myToken = randomBytes(24).toString('base64url');
+    this.tokens.set(myToken, seat);
     this.broadcastRoom();
     this.sendSeedCommit(ws); // 入座即下发当前种子承诺（局前锁定，局后可验证）
     if (this.members.size >= 4) this.startInternal();
-    return { seat, started: this.started, rejoined: false };
+    return { seat, started: this.started, rejoined: false, token: myToken };
   }
 
   /** 房间摘要（供房间列表） */

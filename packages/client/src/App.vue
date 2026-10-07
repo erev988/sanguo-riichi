@@ -32,14 +32,33 @@ const generalId = ref('gen-guanyu');
 let joinedRoom = '';
 const kiriageMangan = ref(false);
 const soundOn = ref(true);
-const token = ref(
-  localStorage.getItem('sanguo-token') ??
-    (() => {
-      const t = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      localStorage.setItem('sanguo-token', t);
-      return t;
-    })(),
-);
+/** 会话令牌：由服务器用 CSPRNG 生成并在 welcome 下发（客户端自选的弱 token 可被猜中抢座） */
+const token = ref(localStorage.getItem('sanguo-token') ?? '');
+
+/** 是否因「已有活跃标签页」而让位（避免同 token 互踢） */
+const duplicateTab = ref(false);
+
+/** 多标签页单实例：后开的标签页让位，不建立连接 */
+function initTabLock(): void {
+  if (typeof BroadcastChannel === 'undefined') return;
+  const tabId = Math.random().toString(36).slice(2);
+  const ch = new BroadcastChannel('sanguo-riichi');
+  ch.onmessage = (ev: MessageEvent) => {
+    const d = ev.data as { type: string; id: string };
+    if (d.id === tabId) return;
+    if (d.type === 'hello') {
+      ch.postMessage({ type: 'busy', id: tabId }); // 告知新标签页「我在这里」
+    } else if (d.type === 'busy') {
+      duplicateTab.value = true;
+      net.close();
+      connected.value = false;
+      status.value = '已在其他标签页打开（本页不连接）';
+    }
+  };
+  ch.postMessage({ type: 'hello', id: tabId });
+  tabChannel = ch;
+}
+let tabChannel: BroadcastChannel | null = null;
 const rooms = ref<RoomInfo[]>([]);
 
 const mySeat = ref<number | null>(null);
@@ -520,6 +539,10 @@ function handleEffect(e: GameEffect): void {
 function handleMsg(msg: ServerMsg): void {
   switch (msg.t) {
     case 'welcome':
+      if (msg.token) {
+        token.value = msg.token;
+        localStorage.setItem('sanguo-token', msg.token);
+      }
       mySeat.value = msg.seat;
       joinedRoom = msg.roomId; // 记录成功入座的房间，供断线复座
       status.value = msg.started ? '对局中' : '等待入座…';
@@ -644,6 +667,11 @@ function pickRoom(r: RoomInfo): void {
 
 /** 本局定牌信息（牌局公正性：承诺 → 局后公开 → 本地校验） */
 function connectOnly(): void {
+  if (duplicateTab.value) {
+    // 用户坚持在本页使用：接管连接（原标签页会在下次心跳/重连时让位）
+    duplicateTab.value = false;
+    status.value = '本页接管连接…';
+  }
   void enterFullscreenLandscape(); // 移动端：自动进入全屏并锁横屏
   net.onOpen = () => {
     connected.value = true;
@@ -847,6 +875,7 @@ function onResize(): void {
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 if (typeof window !== 'undefined') {
   window.addEventListener('resize', onResize);
+  initTabLock();
   document.addEventListener('visibilitychange', handleVisibility);
   tickTimer = setInterval(() => {
     nowTick.value = Date.now();
