@@ -496,13 +496,20 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
             : [action.tile, action.tile, action.tile];
       const hand = [...p.hand];
       for (const t of need) {
-        const i = hand.indexOf(t);
+        let i = hand.indexOf(t);
+        if (i < 0) {
+          // ★ 赤 5 可顶替普通 5（0↔5 / 10↔15 / 20↔25）
+          const aka = t === 5 ? 0 : t === 15 ? 10 : t === 25 ? 20 : -1;
+          if (aka >= 0) i = hand.indexOf(aka as Tile);
+        }
         if (i < 0) return fail('手牌不足，无法副露');
         hand.splice(i, 1);
       }
       // 吃必须是同花色连续顺子
       if (action.type === 'chii') {
-        const trio = [...action.tiles, action.tile].sort((a, b) => a - b);
+        // ★ 归一化赤 5 后再校验连续性（否则 0m+7m 吃 6m 会被误拒）
+        const norm = (t: Tile): Tile => (t === 0 ? 5 : t === 10 ? 15 : t === 20 ? 25 : t);
+        const trio = [...action.tiles, action.tile].map(norm).sort((a, b) => a - b);
         const s0 = Math.floor(trio[0] / 10);
         if (
           s0 !== Math.floor(trio[1] / 10) ||
@@ -589,7 +596,9 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       clearIppatsu(s);
       applyCallSkills(s, opts, me, 'ankan', effects); // 杠也触发副露钩子
       // 四杠散了 → 途中流局
-      if (totalKantsu(s) >= 4) return settleAbortive(s, effects, 'suukantsu');
+      if (totalKantsu(s) >= 4 && kantOwnerCount(s) >= 2) {
+        return settleAbortive(s, effects, 'suukantsu');
+      } // ★ 同一玩家开满四杠是「四杠子」役满，不流局
       break;
     }
 
@@ -634,7 +643,9 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       clearIppatsu(s);
       applyCallSkills(s, opts, me, 'kakan', effects); // 杠也触发副露钩子
       // 四杠散了 → 途中流局
-      if (totalKantsu(s) >= 4) return settleAbortive(s, effects, 'suukantsu');
+      if (totalKantsu(s) >= 4 && kantOwnerCount(s) >= 2) {
+        return settleAbortive(s, effects, 'suukantsu');
+      } // ★ 同一玩家开满四杠是「四杠子」役满，不流局
       break;
     }
   }
@@ -856,6 +867,13 @@ function keepsRiichiTenpai(p: PlayerState, handWithDraw: Tile[], melds: Meld[]):
 }
 
 /** 全场杠数（大明杠 + 暗杠 + 加杠） */
+/** 开过杠的玩家数（四杠散了只在分属两家以上时成立） */
+function kantOwnerCount(s: GameState): number {
+  return s.players.filter(
+    (p) => p.openMelds.filter((m) => m.type === 'kan' || m.type === 'ankan' || m.type === 'kakan').length > 0,
+  ).length;
+}
+
 function totalKantsu(s: GameState): number {
   return s.players.reduce(
     (a, p) => a + p.openMelds.filter((m) => m.type === 'kan' || m.type === 'ankan' || m.type === 'kakan').length,
@@ -910,7 +928,10 @@ export function advanceRound(s: GameState, newSeed?: string): GameState {
   const dealer = s.dealer;
   const dealerWon = res ? res.winners.includes(dealer) : false;
   const dealerTenpai = res ? res.tenpai[dealer] : false;
-  const renchan = s.reason === 'normal' ? dealerWon : s.reason === 'ryukyoku' ? dealerTenpai : false;
+  // ★ 途中流局（九种九牌/四风连打/四杠散了/四家立直）规则上都是**连庄**（本场 +1）
+  const abortive = ['kyuushu', 'suufon', 'suukantsu', 'suuchariichi'].includes(s.reason ?? '');
+  const renchan =
+    s.reason === 'normal' ? dealerWon : s.reason === 'ryukyoku' ? dealerTenpai : abortive;
 
   // 终局判定（非连庄时）：
   // 半庄（南 4 局）结束若无人达到返点 → 进入延长战（西场）；

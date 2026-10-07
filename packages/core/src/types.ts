@@ -113,6 +113,10 @@ export interface RoundInfo {
 
 /** 宝牌：指示牌 → 实际宝牌（数牌 +1，风 东→南→西→北→东，三元 白→发→中→白） */
 export function doraFromIndicator(indicator: Tile): Tile {
+  // ★ 赤 5（0/10/20）的牌面就是 5 → 它作指示牌时指向 6（此前原样返回 0，等于丢宝牌）
+  if (indicator === 0) return 6;
+  if (indicator === 10) return 16;
+  if (indicator === 20) return 26;
   if (indicator >= 1 && indicator <= 9) return indicator === 9 ? 1 : indicator + 1; // 万
   if (indicator >= 10 && indicator <= 19) return indicator === 19 ? 11 : indicator + 1; // 饼
   if (indicator >= 20 && indicator <= 29) return indicator === 29 ? 21 : indicator + 1; // 索

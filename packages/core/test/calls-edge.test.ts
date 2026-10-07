@@ -136,7 +136,7 @@ describe('四风连打', () => {
 });
 
 describe('四杠散了', () => {
-  it('第 4 个杠 → 途中流局', () => {
+  it('同一玩家开满四杠 → 不流局（四杠子）', () => {
     const s = dummyState();
     s.awaiting = 'discard';
     // seat0 已有 3 个杠
@@ -147,7 +147,20 @@ describe('四杠散了', () => {
     ];
     s.players[0].hand = [5, 5, 5, 5, 14, 15, 16, 24, 25, 26, 31, 31, 35, 36];
     const r = step(s, { type: 'ankan', player: 0, tile: 5 }, noSkills());
+    // ★ 四杠散了只在「杠分属两家以上」时成立；同一玩家四杠是四杠子役满
+    expect(r.state.phase).toBe('playing');
+  });
+
+  it('四杠分属两家以上 → 途中流局', () => {
+    const s = dummyState();
+    s.awaiting = 'discard';
+    s.players[0].openMelds = [
+      { type: 'kan', tiles: [2, 2, 2, 2] },
+      { type: 'ankan', tiles: [3, 3, 3, 3] },
+    ];
+    s.players[1].openMelds = [{ type: 'kan', tiles: [7, 7, 7, 7] }];
+    s.players[0].hand = [5, 5, 5, 5, 14, 15, 16, 24, 25, 26, 31, 31, 35, 36];
+    const r = step(s, { type: 'ankan', player: 0, tile: 5 }, noSkills());
     expect(r.state.phase).toBe('ended');
-    expect(r.state.reason).toBe('ryukyoku');
   });
 });
