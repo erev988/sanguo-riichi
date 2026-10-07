@@ -276,6 +276,15 @@ function collectYaku(ctx: YakuContext): AgariYaku[] {
 }
 
 function calcFu(ctx: AgariContext, decomps: WinDecomp[]): number {
+  // ★ 同一手牌可能有多种拆法（如 111222333 可拆三刻或三顺），符数取最优拆法
+  //   （此前直接用 decomps[0]，可能取到低符的拆法）
+  let best = 0;
+  for (const d of decomps) best = Math.max(best, calcFuOne(ctx, d));
+  return best;
+}
+
+function calcFuOne(ctx: AgariContext, decomp: WinDecomp): number {
+  const decomps = [decomp];
   let fu = 20; // 副底
   // 面子符：手牌里的刻子原则上都是暗刻（幺九 8 / 中张 4），
   // 例外：荣和补成的那组刻子按明刻（幺九 4 / 中张 2）——见「双碰荣和」

@@ -257,6 +257,18 @@ function windOf(seat: number): string {
 /** 该座位是否庄家 */
 const isDealer = (seat: number): boolean => seat === dealer.value;
 
+/** 支付行文案：区分立直棒 / 听牌罚符 / 玩家支付（此前 from<0 一律显示「立直棒 →」） */
+function payLabel(p: { from: number; to: number; amount: number }): string {
+  if (p.from >= 0 && p.to >= 0) return `${memberName(p.from)} → ${memberName(p.to)}`;
+  if (p.from < 0 && p.to >= 0) {
+    return p.amount % 1000 === 0
+      ? `立直棒 → ${memberName(p.to)}`
+      : `听牌罚符 → ${memberName(p.to)}`;
+  }
+  if (p.from >= 0 && p.to < 0) return `${memberName(p.from)} 支付罚符`;
+  return '—';
+}
+
 function memberName(seat: number, face = 'P'): string {
   const m = roomMembers.value.find((x) => x.seat === seat);
   if (m) return m.name;
@@ -1330,7 +1342,7 @@ onBeforeUnmount(() => {
           </div>
           <table v-if="result.payments.length" class="pay-table">
             <tr v-for="(p, i) in result.payments" :key="i">
-              <td>{{ p.from >= 0 ? memberName(p.from) + " → " + memberName(p.to) : "立直棒 → " + memberName(p.to) }}</td>
+              <td>{{ payLabel(p) }}</td>
               <td class="num">{{ p.amount }}</td>
             </tr>
           </table>

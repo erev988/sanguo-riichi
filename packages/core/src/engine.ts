@@ -568,7 +568,8 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       if (p.log.riichi) {
         const handAfter = [...p.hand];
         for (let k = 0; k < 4; k++) handAfter.splice(handAfter.indexOf(action.tile), 1);
-        if (s.wall.length > 0) handAfter.push(s.wall[s.wall.length - 1]); // 模拟岭上摸
+        // ★ 岭上牌从 rinshanWall 取（此前取 wall 末张，模拟用错牌 → 可能误放行/误拒绝立直后杠）
+        if (s.rinshanWall.length > 0) handAfter.push(s.rinshanWall[s.rinshanWall.length - 1]);
         const meldsAfter: Meld[] = [
           ...p.openMelds,
           { type: 'ankan', tiles: [action.tile, action.tile, action.tile, action.tile] },
@@ -786,9 +787,15 @@ function settleRyukyoku(s: GameState, opts: StepOptions, effects: GameEffect[]):
       payments.push(
         ...computePayments({ kind: 'tsumo', yaku: ['流局满贯'], han: 5, fu: 30 }, seat, s.dealer, undefined, {
           kiriageMangan: s.rules.kiriageMangan,
+          riichiSticks: s.riichiSticks, // ★ 流局满贯同样收走场上立直棒
+          honba: s.round.honba, // ★ 同样加算本场
         }),
       );
     }
+    // ★ 流局满贯按「和了」处理：设 lastResult，庄家流局满贯才能正确连庄
+    const nagashiWinners = nagashi.map((x, i) => (x ? i : -1)).filter((i) => i >= 0);
+    s.lastResult = { winners: nagashiWinners, tenpai };
+    s.riichiSticks = 0;
   } else if (!suppressed && nTen > 0 && nTen < 4) {
     // 基础流局罚符：不听者 子1000 / 亲2000，听牌者平分（被技能接管时不结算）
     let total = 0;
@@ -835,8 +842,10 @@ function applyPayments(s: GameState, payments: Payment[], opts?: StepOptions): v
     }
   }
   for (const { from, to, amount } of payments) {
-    if (from >= 0) s.players[from].score -= amount;
-    if (to >= 0) s.players[to].score += amount;
+    // ★ 防御：技能可能把金额改成负数/小数（写错即造成反向转账、点棒出现小数）
+    const amt = Math.max(0, Math.floor(amount));
+    if (from >= 0) s.players[from].score -= amt;
+    if (to >= 0) s.players[to].score += amt;
   }
 }
 
@@ -935,12 +944,18 @@ export function advanceRound(s: GameState, newSeed?: string): GameState {
 
   // 终局判定（非连庄时）：
   // 半庄（南 4 局）结束若无人达到返点 → 进入延长战（西场）；
-  // 延长战中达成返点或西 4 局结束 → 终局。
-  if (!renchan) {
+  // 终局判定：
+  // - 半庄（南 4）结束且有人达到返点 → 终局；否则进入延长战（西场）
+  // - 延长战：**无论连庄与否**，一旦有人达到返点即终局（西 4 结束也终局）
+  //   （此前检查被包在 if(!renchan) 内，西场庄家连庄时会一直打下去）
+  {
     const { wind, round: rr } = s.round;
     const reachedOrigin = Math.max(...s.players.map((p) => p.score)) >= s.rules.origin;
-    if (wind === 'south' && rr === 4 && reachedOrigin) return s;
-    if (wind === 'west' && (reachedOrigin || rr === 4)) return s;
+    if (wind === 'west' && reachedOrigin) return s;
+    if (!renchan) {
+      if (wind === 'south' && rr === 4 && reachedOrigin) return s;
+      if (wind === 'west' && rr === 4) return s;
+    }
   }
 
   // 本场：连庄 +1；荒牌流局即便进庄也 +1（雀魂规则）；其余进庄归 0

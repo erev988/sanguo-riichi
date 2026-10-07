@@ -230,7 +230,13 @@ export class Room {
         }, 30000);
       }
     }
-    this.scheduleAI();
+    // ★ 若正处于响应窗口，断线转托管后要重新评估一次：
+    //   否则被托管的 AI 会错过本可荣和的牌（scheduleResponse 只在开窗时评估一次）
+    if (this.state && (this.state.lastDiscard || this.state.pendingKakan)) {
+      this.scheduleResponse();
+    } else {
+      this.scheduleAI();
+    }
   }
 
   handle(ws: WebSocket, msg: { t?: string; action?: Action; seq?: number }): void {
