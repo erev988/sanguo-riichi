@@ -158,8 +158,12 @@ export function legalActions(s: GameState): Action[] {
 
   if (s.awaiting === 'draw') {
     if (s.wall.length > 0) acts.push({ type: 'draw' });
-    // 九种九牌（第一巡）
-    if (s.turnCount === 0 && new Set(p.hand.filter(isYaochuupaiLocal)).size >= 9) {
+    // 九种九牌：自己这一巡尚未打过牌，且无人副露，幺九种类 ≥ 9
+    if (
+      p.log.discards === 0 &&
+      s.players.every((x) => x.openMelds.length === 0) &&
+      new Set(p.hand.filter(isYaochuupaiLocal)).size >= 9
+    ) {
       acts.push({ type: 'kyuushu' });
     }
   } else {
@@ -297,18 +301,10 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       s.current = (s.current + 1) % 4;
       s.awaiting = 'draw';
       s.turnCount += 1;
-      // 四风连打：四家第一张弃牌为同一风牌 → 途中流局
-      if (
-        s.turnCount === 4 &&
-        s.firstDiscards.every((t) => t !== null && t >= 31 && t <= 34 && t === s.firstDiscards[0])
-      ) {
-        return settleAbortive(s, effects, 'suufon');
-      }
-      // 四家立直 → 途中流局
-      if (s.players.every((x) => x.log.riichi)) {
-        return settleAbortive(s, effects, 'suuchariichi');
-      }
-      if (s.wall.length === 0) return settleRyukyoku(s, opts, effects); // 牌山摸尽 → 荒牌流局
+      // ★ 四风连打 / 四家立直 的判定延后到响应窗口关闭后（case 'pass'）：
+      //   第 4 张立直宣言牌 / 第 4 张同风牌 本身也可能被荣和
+      // ★ 不再在「摸牌后」立即流局：摸到海底牌的人要能打牌，他家才能河底捞鱼；
+      //   真正的荒牌流局在响应窗口关闭后判定（见 case 'pass'）
       break;
     }
 
@@ -416,10 +412,22 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       }
       s.pendingKakan = undefined;
       s.lastDiscard = undefined;
-      effects.push({ type: 'passed' });
-      break;
       // ★ 同巡振听：本巡放弃过荣和，则本巡内不得再和
       s.players[s.current].log.furitenTurn = s.turnCount;
+      effects.push({ type: 'passed' });
+      // ★ 响应窗口关闭后才判定各种流局（此前在打牌瞬间就判，导致
+      //   河底捞鱼 / 第 4 张立直宣言牌被荣和 都不可达）
+      if (s.players.every((x) => x.log.riichi)) {
+        return settleAbortive(s, effects, 'suuchariichi');
+      }
+      if (
+        s.turnCount === 4 &&
+        s.firstDiscards.every((t) => t !== null && t >= 31 && t <= 34 && t === s.firstDiscards[0])
+      ) {
+        return settleAbortive(s, effects, 'suufon');
+      }
+      if (s.wall.length === 0) return settleRyukyoku(s, opts, effects); // 河底无人荣和 → 荒牌流局
+      break;
     }
 
     case 'ryukyoku': {
@@ -432,7 +440,9 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
     // ---- 九种九牌（第一巡，幺九种类 ≥ 9 可宣告流局） ----
     case 'kyuushu': {
       const p = s.players[s.current];
-      if (s.turnCount !== 0) return fail('只能在第一巡宣告九种九牌');
+      // ★ 规则是「各家自己的第一巡」，不是全局 turnCount===0（否则只有庄家能宣告）
+      if (p.log.discards > 0) return fail('只能在自己第一巡宣告九种九牌');
+      if (s.players.some((x) => x.openMelds.length > 0)) return fail('有人副露后不能宣告九种九牌');
       if (s.awaiting !== 'draw') return fail('摸牌前才能宣告九种九牌');
       const kinds = new Set(p.hand.filter((t) => isYaochuupaiLocal(t))).size;
       if (kinds < 9) return fail('幺九牌种类不足 9 种');

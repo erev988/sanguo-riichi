@@ -107,10 +107,11 @@ describe('九种九牌', () => {
     expect(step(s, { type: 'kyuushu' }, noSkills()).error).toBeTruthy();
   });
 
-  it('非首巡 → 拒绝', () => {
+  it('非首巡（自己已打过牌）→ 拒绝', () => {
     const s = dummyState();
     s.turnCount = 1;
     s.awaiting = 'draw';
+    s.players[0].log.discards = 1; // ★ 规则是「各家自己的第一巡」：已打过牌就不能再宣告
     s.players[0].hand = [1, 9, 11, 19, 21, 29, 31, 32, 33, 2, 3, 4, 5];
     expect(step(s, { type: 'kyuushu' }, noSkills()).error).toBeTruthy();
   });

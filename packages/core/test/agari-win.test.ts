@@ -35,22 +35,46 @@ describe('和牌判定 evaluateAgari（agari.ls 转写）', () => {
     expect(r!.fu).toBe(20);
   });
 
-  it('清一色荣和：1112345678999m + 3m → 清一色 6 番', () => {
+  it('九莲宝灯：1112345678999m 形，和 3m（非 1/9）→ 役满九莲宝灯', () => {
     const ctx = makeAgari({
-      juntehai: [1, 1, 1, 2, 4, 5, 6, 7, 8, 9, 9, 9, 3], // 听 3m
+      juntehai: [1, 1, 1, 2, 4, 5, 6, 7, 8, 9, 9, 9, 3],
       agariPai: 3,
       isTsumo: false,
     });
     const r = evaluateAgari(ctx);
     expect(r).not.toBeNull();
-    expect(r!.yaku.map((y) => y.name)).toContain('清一色');
-    expect(r!.hanTotal).toBe(6);
+    // 此前 isChuuren 原地改写共享 bins：纯正判定先消耗掉 → 九莲宝灯永不可达（被降级成清一色）
+    expect(r!.yakuman.map((y) => y.name)).toContain('九莲宝灯');
   });
 
-  it('七对：11223344556677m → 七对子 2 番 25 符', () => {
+  it('清一色：非九莲形的全万子 → 6 番', () => {
+    const ctx = makeAgari({
+      juntehai: [1, 2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5],
+      agariPai: 5,
+      isTsumo: false,
+    });
+    const r = evaluateAgari(ctx);
+    expect(r).not.toBeNull();
+    expect(r!.yaku.map((y) => y.name)).toContain('清一色');
+  });
+
+  it('七对形同时能做标准形时择优：11223344556677m → 取标准形（清一色+二杯口+平和+门自）', () => {
     const ctx = makeAgari({
       juntehai: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7],
       agariPai: 7,
+    });
+    const r = evaluateAgari(ctx);
+    expect(r).not.toBeNull();
+    // 报告 P1-5：此前七对分支直接 return，导致这种牌形被低算成 2 番
+    const names = r!.yaku.map((y) => y.name);
+    expect(names).toContain('二杯口');
+    expect(r!.hanTotal).toBeGreaterThan(2);
+  });
+
+  it('纯七对形（含字牌，无标准拆法）→ 七对子 2 番 25 符', () => {
+    const ctx = makeAgari({
+      juntehai: [1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 32, 32, 35],
+      agariPai: 35,
     });
     const r = evaluateAgari(ctx);
     expect(r).not.toBeNull();

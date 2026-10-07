@@ -329,6 +329,9 @@ export class Room {
         const p = st.players[seat];
         const tile = p.hand[p.hand.length - 1]; // 自动摸切（打出刚摸的牌）
         if (tile != null) this.act(seat, { type: 'discard', tile });
+      } else if (st.current === seat && st.awaiting === 'draw') {
+        // ★ 等玩家是否宣告九种九牌的超时兜底（否则会卡住）
+        this.act(seat, { type: 'draw' });
       }
     }, TOTAL);
     this.thinkTimers.set(seat, t);
@@ -382,7 +385,8 @@ export class Room {
       const hasReal = acts.some((a) => a.type !== 'pass');
       const needsThink =
         hasReal ||
-        (st.awaiting === 'discard' && st.current === seat && !st.lastDiscard && !st.pendingKakan);
+        (st.awaiting === 'discard' && st.current === seat && !st.lastDiscard && !st.pendingKakan) ||
+        (st.awaiting === 'draw' && st.current === seat && all.some((a) => a.type === 'kyuushu'));
       if (needsThink) this.startThinkTimer(seat, { response: hasWindow });
       else this.clearThinkTimer(seat);
     }
@@ -392,6 +396,10 @@ export class Room {
   private maybeAutoDraw(seat: number): void {
     if (!this.state || this.state.awaiting !== 'draw') return;
     if (this.state.lastDiscard || this.state.pendingKakan) return;
+    // ★ 若该座位此刻可以宣告九种九牌，先别替他摸牌（否则按钮永远来不及出现）
+    if (this.state.current === seat && legalActions(this.state).some((a) => a.type === 'kyuushu')) {
+      return;
+    }
     clearTimeout(this.drawTimer);
     this.drawTimer = setTimeout(() => {
       if (!this.state || this.state.phase !== 'playing') return;

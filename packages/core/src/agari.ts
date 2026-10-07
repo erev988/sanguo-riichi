@@ -157,12 +157,14 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   for (const f of ctx.fuuro) all.push(...f.tiles);
   const c14 = countsOf(all);
 
-  // 七对（2 番，固定 25 符，不参与标准拆解）
+  // 七对（2 番，固定 25 符）—— 不立即返回：与标准形比较后择优
+  // （例：223344m667788p55s 既可拆七对，也可作标准形取平和+断幺+二盃口+门自）
+  let chiitoiResult: AgariResult | null = null;
   if (isChiitoi(c14)) {
     const yakuCtx = makeYakuContext(ctx, all, c14, [], true, false);
     const yaku = collectYaku(yakuCtx);
     addDora(ctx, all, yaku);
-    return {
+    chiitoiResult = {
       yaku,
       hanTotal: yaku.reduce((a, x) => a + x.han, 0),
       fu: 25,
@@ -194,7 +196,8 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
   // 标准形：副露面子已固定，手牌只需再凑 (4 - 副露数) 个面子 + 1 雀头
   const needMentsu = Math.max(0, 4 - ctx.fuuro.length);
   const decomps = enumerateDecomps([...ctx.juntehai, ctx.agariPai], needMentsu);
-  if (decomps.length === 0) return null;
+  if (decomps.length === 0) return chiitoiResult; // 只有七对形
+  
   const pinfu = isPinfu(ctx, decomps);
   const yakuCtx = makeYakuContext(ctx, all, c14, decomps, false, false);
   const yaku = collectYaku(yakuCtx);
@@ -211,7 +214,7 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
 
   // 符数（平和：门清荣和 30 符 / 自摸 20 符）
   const fu = pinfu ? (ctx.menzen && !ctx.isTsumo ? 30 : 20) : calcFu(ctx, decomps);
-  return {
+  const stdResult: AgariResult = {
     yaku,
     hanTotal: yaku.reduce((a, x) => a + x.han, 0),
     fu,
@@ -220,6 +223,14 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
     agariPai: ctx.agariPai,
     winDecomp: decomps[0] ?? null,
   };
+  // 七对与标准形并存时择优：番数高者优先，同番则符高者优先
+  if (chiitoiResult) {
+    const better =
+      chiitoiResult.hanTotal > stdResult.hanTotal ||
+      (chiitoiResult.hanTotal === stdResult.hanTotal && chiitoiResult.fu > stdResult.fu);
+    return better ? chiitoiResult : stdResult;
+  }
+  return stdResult;
 }
 
 // ---- 内部 ----

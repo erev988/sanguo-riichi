@@ -427,7 +427,9 @@ function isChuuren(ctx: YakuContext, pure: boolean): boolean {
   if (!ctx.menzen) return false;
   const s = SUIT(ctx.agariPai);
   if (!isSuupai(ctx.agariPai)) return false;
-  const bins = ctx.bins[s];
+  // ★ 必须复制：此前的原地修改会消耗共享 bins，使「纯正九莲」判定后
+  //   「九莲宝灯」永远不可能成立
+  const bins = [...ctx.bins[s]];
   const base = [3, 1, 1, 1, 1, 1, 1, 1, 3];
   for (let i = 0; i < 9; i++) {
     if (bins[i] < base[i]) return false;
