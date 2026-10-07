@@ -278,15 +278,18 @@ export class Room {
   }
 
   /**
-   * 思考时限：默认 25s + 10s 补时（35s）；一旦该玩家超时过，本局内之后只用 10s。
+   * 思考时限：
+   *  - 打牌决策：默认 25s + 10s 补时（35s）
+   *  - 响应窗口（要不要吃/碰/杠/荣和）：12s，短时限，避免拖住其他三家
+   *  - 一旦该玩家超时过，本局内之后只用 10s
    * 同一决策点内不因点击而重置（防刷时间）。
    */
-  private startThinkTimer(seat: number): void {
+  private startThinkTimer(seat: number, opts?: { response?: boolean }): void {
     const now = Date.now();
     const existing = this.thinkDeadline.get(seat);
     if (existing != null && existing > now) return; // 该决策点已在计时 → 保持剩余时间
     this.clearThinkTimer(seat);
-    const TOTAL = this.timedOutPlayers.has(seat) ? 10_000 : 35_000;
+    const TOTAL = this.timedOutPlayers.has(seat) ? 10_000 : opts?.response ? 12_000 : 35_000;
     const deadline = now + TOTAL;
     this.thinkDeadline.set(seat, deadline);
     this.sendTo(seat, { type: 'timer', seat, ms: TOTAL, total: TOTAL, targetSeat: seat });
@@ -339,7 +342,9 @@ export class Room {
         if (p != null) return p === seat; // 副露/荣和：声明者自己
         return seat === st.current; // 自摸/九种九牌：当前行动者
       });
-      if (acts.length > 0) {
+      const realActs = acts.filter((a) => a.type !== 'pass');
+      if (realActs.length > 0) {
+        // 只下发「实质动作」；仅有 pass 时不打扰玩家（服务器会在无人可动作时自动过）
         m.ws?.send(
           JSON.stringify({
             t: 'events',
@@ -349,10 +354,12 @@ export class Room {
         );
       }
       // 需要决策（有按钮）或需要打牌 → 起思考计时
+      // ★ 「只有 pass」不算需要决策：服务器会自动替他过，不打扰玩家、也不显示倒计时
+      const hasReal = acts.some((a) => a.type !== 'pass');
       const needsThink =
-        acts.length > 0 ||
+        hasReal ||
         (st.awaiting === 'discard' && st.current === seat && !st.lastDiscard && !st.pendingKakan);
-      if (needsThink) this.startThinkTimer(seat);
+      if (needsThink) this.startThinkTimer(seat, { response: hasWindow });
       else this.clearThinkTimer(seat);
     }
   }

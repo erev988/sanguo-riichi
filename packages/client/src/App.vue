@@ -87,11 +87,16 @@ watch(compact, (v) => localStorage.setItem('sanguo-compact', v ? '1' : '0'));
 const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
 const vh = ref(typeof window !== 'undefined' ? window.innerHeight : 800);
 
+/** 局面推进时清掉旧倒计时（服务器需要时会给新的 timer，避免残留"读秒中"） */
+function clearTimer(): void {
+  timerEnd.value = 0;
+}
+
 /** 剩余秒数（无计时为 null） */
 const remainSec = computed(() => {
   if (timerEnd.value <= 0) return null;
   const ms = timerEnd.value - nowTick.value;
-  if (ms <= 0) return 0;
+  if (ms <= 0) return null; // 到点即隐藏（超时由服务器自动动作并下发新状态）
   return Math.ceil(ms / 1000);
 });
 /** 是否进入补时（最后 10 秒） */
@@ -327,6 +332,18 @@ function animateDelta(target: number[]): void {
 }
 
 function handleEffect(e: GameEffect): void {
+  // 局面推进 → 清掉旧倒计时（服务器需要时会给新的 timer，避免残留显示"读秒中"）
+  if (
+    e.type === 'discarded' ||
+    e.type === 'drawn' ||
+    e.type === 'called' ||
+    e.type === 'agaru' ||
+    e.type === 'ryukyoku' ||
+    e.type === 'gameStarted' ||
+    e.type === 'gameEnded'
+  ) {
+    clearTimer();
+  }
   const nm = (s: number): string => memberName(s);
   const line = describe(e, nm);
   if (line) pushLog(line);
