@@ -62,7 +62,7 @@ describe('引擎：和牌结算 + 沮授渐营', () => {
 });
 
 describe('引擎：关羽武圣（万面子加番）', () => {
-  it('手牌万面子按拆解计入 → 3 番变 6 番', () => {
+  it('手牌万面子按拆解计入 → 3 番变 6 番（且技能数值被记录）', () => {
     const s = dummyState();
     const skillsOfMan = (seat: number) => (seat === 0 ? [wusheng] : []);
     s.turnCount = 10; // 非首巡（避免触发天和）
@@ -73,6 +73,8 @@ describe('引擎：关羽武圣（万面子加番）', () => {
     if (agaru?.type !== 'agaru') throw new Error('未产生和牌事件');
     expect(agaru.yaku).toEqual(expect.arrayContaining(['一气通贯', '门清自摸']));
     expect(agaru.han).toBe(6);
+    // 结算面板展示用：技能改动的番数被记录
+    expect(agaru.skills).toEqual([{ skill: '武圣', han: 3, fu: 0 }]);
   });
 });
 
@@ -103,17 +105,6 @@ describe('引擎：流局 + 技能三', () => {
 });
 
 describe('和牌事件携带技能数值（供结算面板显示）', () => {
-  it('关羽武圣：万面子 ×3 → 和牌事件里记录 +3 番', () => {
-    const s = dummyState();
-    s.turnCount = 10;
-    s.awaiting = 'discard';
-    // 123m 456m 789m 456p 白白 → 3 个万面子
-    s.players[0].hand = [1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16, 35, 35];
-    const r = step(s, { type: 'tsumo' }, { skillsOf: (seat: number) => (seat === 0 ? [wusheng] : []) });
-    const agaru = r.effects.find((e) => e.type === 'agaru');
-    if (agaru?.type !== 'agaru') throw new Error('未和牌');
-    expect(agaru.skills).toEqual([{ skill: '武圣', han: 3, fu: 0 }]);
-  });
 
   it('技能可把番数扣到 0 番：0 番仍可和牌，且照常收走立直棒（以技能为准）', () => {
     const s = dummyState();

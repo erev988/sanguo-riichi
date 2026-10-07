@@ -18,7 +18,7 @@
 | 前端 | Vue 3 + Vite（只发命令、收广播，不做任何判定） |
 | 服务端 | Node + `ws`（权威服务器） |
 | 协议 | zod 运行时校验 + 协议版本号 |
-| 测试 | Vitest（189 项） |
+| 测试 | Vitest（188 项） |
 
 ## 目录结构
 
@@ -30,7 +30,7 @@ riichi-sanguo/
 │  ├─ skills.ts        # ★ 技能钩子 + 声明式能力
 │  ├─ generals.ts      #   10 名武将数据
 │  ├─ sha256.ts        #   SHA-256 加盐随机（洗牌源）
-│  └─ test/            #   189 项单测
+│  └─ test/            #   188 项单测
 ├─ packages/shared/    # 前后端协议（zod）
 ├─ packages/server/    # 权威服务器：房间 / 真人匹配队列 / AI 托管 / 断线快照 / 录像
 └─ packages/client/    # Vue3：大厅选将 / 牌桌 / 结算卷轴 / 回放 / 武将详情
@@ -40,7 +40,7 @@ riichi-sanguo/
 
 ```bash
 npm install
-npm test              # 189 项单测
+npm test              # 188 项单测
 npm run dev:server    # ws://localhost:8787
 npm run dev:client    # http://localhost:5173
 ```
@@ -152,7 +152,7 @@ location /ws {
 
 | 项 | 结果 |
 |---|---|
-| 单元测试 | ✅ 21 文件 / **189 项**全过 |
+| 单元测试 | ✅ 21 文件 / **188 项**全过 |
 | 类型检查 | ✅ core / shared / server 均 0 错误 |
 | 前端构建 | ✅ vite build 通过 |
 | 端到端综合校验 | ✅ 11 项：匹配 4 真人自动开局（无 AI）/ 承诺校验 / 盐校验 / 本地复算牌序 / 快照不含种子 / 牌山打码 / 里宝打码 / 不含他人手牌 |
