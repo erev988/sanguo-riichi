@@ -18,7 +18,8 @@ function tileFile(t: Tile): string {
 }
 
 const props = defineProps<{
-  tile: Tile;
+  /** 牌面编码；背面牌（back）可不传 */
+  tile?: Tile;
   /** 高度（px），宽度按标准比例 19:26 自动算 */
   size?: number;
   /** 变暗（弃牌等次要信息） */
@@ -30,7 +31,7 @@ const props = defineProps<{
 }>();
 
 const src = computed(() =>
-  props.back ? undefined : modules[`../assets/tiles/${tileFile(props.tile)}.svg`],
+  props.back ? undefined : modules[`../assets/tiles/${tileFile(props.tile ?? 0)}.svg`],
 );
 const h = computed(() => props.size ?? 42);
 const w = computed(() => Math.round((h.value * 19) / 26));

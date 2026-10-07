@@ -1,0 +1,33 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查（core / shared / server / client）
+        # 客户端用 vue-tsc：模板里引用了不存在的函数会在这里直接报错
+        run: npm run typecheck
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 前端引用完整性（模板/脚本引用未定义标识符 + 关键链路断言）
+        run: node tools/check-client-refs.mjs
+
+      - name: 前端构建
+        run: npm run build -w @sanguo/client

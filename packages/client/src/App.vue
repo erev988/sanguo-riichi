@@ -9,7 +9,7 @@ import {
   type Meld,
   type Tile,
 } from '@sanguo/core';
-import type { ServerMsg } from '@sanguo/shared';
+import type { RoomInfo, ServerMsg } from '@sanguo/shared';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import TileSprite from './components/TileSprite.vue';
 import { Net } from './net';
@@ -40,7 +40,7 @@ const token = ref(
       return t;
     })(),
 );
-const rooms = ref<{ id: string; humans: number; ais: number; started: boolean }[]>([]);
+const rooms = ref<RoomInfo[]>([]);
 
 const mySeat = ref<number | null>(null);
 const roomMembers = ref<{ seat: number; name: string; isAI: boolean; generalId: string }[]>([]);
@@ -613,7 +613,7 @@ function joinById(room: string, pwd?: string): void {
 }
 
 /** 点击列表某房的「加入」 */
-function pickRoom(r: { id: string; locked: boolean; started: boolean }): void {
+function pickRoom(r: RoomInfo): void {
   if (r.locked) {
     joinRoomId.value = r.id;
     status.value = `「${r.id}」需要密码，请填写密码后点「加入」`;
@@ -624,6 +624,47 @@ function pickRoom(r: { id: string; locked: boolean; started: boolean }): void {
 }
 
 /** 本局定牌信息（牌局公正性：承诺 → 局后公开 → 本地校验） */
+function connectOnly(): void {
+  void enterFullscreenLandscape(); // 移动端：自动进入全屏并锁横屏
+  net.onOpen = () => {
+    connected.value = true;
+    if (joinedRoom) {
+      status.value = '重连中，恢复座位…';
+      sendJoin(joinedRoom, ''); // 断线后自动复座（token 免密码）
+    } else {
+      status.value = '已连接';
+      net.send({ t: 'rooms' }); // 连上后顺手拉一次房间列表
+    }
+  };
+  net.onClose = () => {
+    connected.value = false;
+    status.value = '连接断开，正在重连…';
+  };
+  net.onReconnecting = (attempt, delayMs) => {
+    status.value = `连接断开，${Math.round(delayMs / 1000)}s 后重连（第 ${attempt} 次）…`;
+  };
+  net.onMsg = handleMsg;
+  const wsUrl =
+    (import.meta.env.VITE_WS_URL as string | undefined) ??
+    `ws://${location.hostname || 'localhost'}:8787`;
+  net.connect(wsUrl);
+  status.value = '连接中…';
+}
+
+function sendJoin(room: string, pwd: string): void {
+  net.send({
+    t: 'join',
+    payload: {
+      name: name.value,
+      roomId: room,
+      generalId: generalId.value,
+      rules: { kiriageMangan: kiriageMangan.value },
+      token: token.value,
+      password: pwd,
+    },
+  });
+}
+
 const seedInfo = ref<{
   commit: string;
   /** 本局定牌时被冻结的指纹（下一局的承诺会覆盖 commit，故单独记录） */

@@ -10,7 +10,8 @@
     "test": "npm run test -w @sanguo/core",
     "dev:server": "tsx watch packages/server/src/index.ts",
     "dev:client": "npm run dev -w @sanguo/client",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "check": "npm run typecheck && npm test && node tools/check-client-refs.mjs"
   },
   "devDependencies": {
     "tsx": "^4.19.1",
