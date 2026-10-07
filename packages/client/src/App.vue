@@ -31,7 +31,8 @@ const generalId = ref('gen-guanyu');
 /** 已成功入座的房间（断线后自动复座；仅入座成功才记录） */
 let joinedRoom = '';
 const kiriageMangan = ref(false);
-const soundOn = ref(true);
+/** 音效开关（持久化；顶栏有按钮） */
+const soundOn = ref(localStorage.getItem('sanguo-sound') !== '0');
 /** 会话令牌：由服务器用 CSPRNG 生成并在 welcome 下发（客户端自选的弱 token 可被猜中抢座） */
 const token = ref(localStorage.getItem('sanguo-token') ?? '');
 
@@ -99,10 +100,7 @@ const timerEnd = ref(0);
 const timerTotal = ref(35000);
 const nowTick = ref(Date.now());
 /** 精简模式（默认开）：收起对手牌背与日志，只留牌桌关键信息 */
-const compact = ref(localStorage.getItem('sanguo-compact') !== '0');
 /** 日志展开（精简模式下默认收起，只留最新一条） */
-const logOpen = ref(false);
-watch(compact, (v) => localStorage.setItem('sanguo-compact', v ? '1' : '0'));
 const vw = ref(typeof window !== 'undefined' ? window.innerWidth : 1280);
 const vh = ref(typeof window !== 'undefined' ? window.innerHeight : 800);
 
@@ -170,7 +168,6 @@ interface Frame {
 const myGeneralId = computed(
   () => roomMembers.value.find((m) => m.seat === mySeat.value)?.generalId ?? generalId.value,
 );
-const currentGeneral = computed(() => ALL_GENERALS.find((g) => g.id === myGeneralId.value));
 
 /** 查看某座位武将详情（点击座位名触发） */
 const inspectSeat = ref<number | null>(null);
@@ -255,7 +252,6 @@ function windOf(seat: number): string {
 }
 
 /** 该座位是否庄家 */
-const isDealer = (seat: number): boolean => seat === dealer.value;
 
 /** 支付行文案：区分立直棒 / 听牌罚符 / 玩家支付（此前 from<0 一律显示「立直棒 →」） */
 function payLabel(p: { from: number; to: number; amount: number }): string {
@@ -915,7 +911,9 @@ function discardTile(t: Tile): void {
 
 watch(soundOn, (v) => {
   sfx.enabled = v;
+  localStorage.setItem('sanguo-sound', v ? '1' : '0');
 });
+sfx.enabled = soundOn.value; // 首次进入即应用持久化设置
 
 /** 移动端：请求全屏并锁定横屏（不支持则用 CSS 兜底旋转） */
 async function enterFullscreenLandscape(): Promise<void> {
@@ -1078,6 +1076,13 @@ onBeforeUnmount(() => {
           <span class="corner-label">场供</span>
           <span class="corner-val">{{ honba * 300 }}</span>
           <span v-if="honba > 0" class="corner-sub">{{ honba }} 本场</span>
+          <button
+            class="mini sound-toggle"
+            :title="soundOn ? '关闭音效' : '开启音效'"
+            @click="soundOn = !soundOn"
+          >
+            {{ soundOn ? '🔊' : '🔇' }}
+          </button>
         </div>
 
         <!-- 对家：横排，整体居中 -->

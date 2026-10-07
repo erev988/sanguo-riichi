@@ -1777,3 +1777,11 @@ textarea {
   border-right: none;
   padding-right: 0;
 }
+
+/* ---------- 顶栏音效开关 ---------- */
+.sound-toggle {
+  margin-left: auto;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 6px;
+}
