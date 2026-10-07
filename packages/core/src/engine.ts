@@ -578,14 +578,14 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       for (let k = 0; k < 4; k++) p.hand.splice(p.hand.indexOf(action.tile), 1);
       const meld: Meld = { type: 'ankan', tiles: [action.tile, action.tile, action.tile, action.tile] };
       p.openMelds.push(meld);
-      effects.push({ type: 'called', player: me, from: me, meld, handCount: p.hand.length });
-      // 岭上摸牌（从岭上区取牌）
+      // ★ 先摸岭上牌，再播报 called —— 否则 handCount 少 1，他家视角手牌数瞬时不对
       if (s.rinshanWall.length > 0) {
         const rinshan = s.rinshanWall.pop()!;
         p.hand.push(rinshan);
         s.rinshan = true; // 岭上开花标志
         effects.push({ type: 'drawn', player: me, tile: rinshan, targetSeat: me });
       }
+      effects.push({ type: 'called', player: me, from: me, meld, handCount: p.hand.length });
       effects.push({ type: 'hand', player: me, tiles: [...p.hand], targetSeat: me });
       // 杠后翻开新宝牌
       if (s.doraCount < 5) s.doraCount += 1;

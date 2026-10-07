@@ -456,6 +456,16 @@ function handleEffect(e: GameEffect): void {
         }
       }
       melds.value[e.player] = [...(melds.value[e.player] ?? []), e.meld];
+      // ★ 若被鸣的牌是某家的立直宣言牌：牌已进入副露区，清掉横置标记
+      //   （此前标记按数组下标记录，被鸣后下标错位 → 横置错牌或丢失）
+      {
+        const ci = riichiDiscardIdx.value[e.from];
+        if (ci != null && (discards.value[e.from] ?? [])[ci] === e.meld.calledTile) {
+          const next = { ...riichiDiscardIdx.value };
+          delete next[e.from];
+          riichiDiscardIdx.value = next;
+        }
+      }
       handCounts.value[e.player] = e.handCount;
       const d = [...(discards.value[e.from] ?? [])];
       for (const t of e.meld.tiles) {
@@ -571,6 +581,11 @@ function handleEffect(e: GameEffect): void {
 function handleMsg(msg: ServerMsg): void {
   switch (msg.t) {
     case 'welcome':
+      // ★ 之前已入座、这次却不是复座 → 原房间已不存在（服务器重启/被回收），
+      //   现在是一个全新的房间，明确告知用户而不是静默继续
+      if (joinedRoom && msg.rejoined !== true) {
+        pushLog('原房间已不存在（服务器可能已重启），已在同名新房间入座');
+      }
       // 协议版本校验（升级提示机制此前是摆设）
       if (msg.protocolVersion !== PROTOCOL_VERSION) {
         status.value = '客户端与服务端协议版本不一致，请刷新页面（Ctrl/Cmd+Shift+R）';

@@ -86,6 +86,7 @@ export class Room {
     rules?: Partial<Rules>,
     token?: string,
     password?: string,
+    opts?: { deferStart?: boolean },
   ): { seat: number; started: boolean; rejoined: boolean; token: string } {
     // 断线重连：token 命中 → 恢复原座位（免密码）
     if (token) {
@@ -135,7 +136,8 @@ export class Room {
     this.tokens.set(myToken, seat);
     this.broadcastRoom();
     this.sendSeedCommit(ws); // 入座即下发当前种子承诺（局前锁定，局后可验证）
-    if (this.members.size >= 4) this.startInternal();
+    // 满员开局；deferStart 时由调用方在发完 welcome 后再启动（保证消息顺序：welcome → gameStarted）
+    if (!opts?.deferStart && this.members.size >= 4) this.startInternal();
     return { seat, started: this.started, rejoined: false, token: myToken };
   }
 
@@ -734,8 +736,7 @@ export class Room {
     }, 2000);
   }
 
-  /** 获取回放数据（含已结束的局与进行中的局） */
-
+  
 
   private stopAI(): void {
     clearTimeout(this.aiTimer);

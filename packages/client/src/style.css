@@ -1133,8 +1133,18 @@ button.join {
   gap: 2px;
   justify-content: center;
   align-content: flex-start;
-  max-height: 40px;
-  overflow: hidden;
+  /* ★ 此前 max-height:40px + overflow:hidden 会把第 3 行起的弃牌静默裁掉
+     （长局后期看不到牌河，立直宣言牌也可能被裁）→ 放宽并允许滚动兜底 */
+  max-height: 132px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.river-top::-webkit-scrollbar,
+.river-bottom::-webkit-scrollbar,
+.river-left::-webkit-scrollbar,
+.river-right::-webkit-scrollbar {
+  display: none;
 }
 
 .river-mid {
@@ -1154,7 +1164,7 @@ button.join {
   gap: 2px;
   align-content: center;
   max-height: 100%;
-  overflow: hidden;
+  overflow-y: auto; /* 同样不再静默裁剪 */
 }
 
 /* 中央方块：四家点数 + 方位 */

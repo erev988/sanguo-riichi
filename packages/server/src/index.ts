@@ -61,10 +61,13 @@ function tryMatch(): void {
     const roomId = `match-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
     const room = new Room(roomId, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`);
     rooms.set(roomId, room);
+    // ★ 先全部入座（不触发开局），统一发 welcome，最后再 startInternal
+    //   否则第 4 人会先收到 gameStarted、后收到 welcome（座位未知，界面短暂错乱）
     group.forEach((w) => {
       try {
-        // 第 4 个人入座即触发开局（4 名真人，不补 AI）
-        const { seat, started, token } = room.join(w.ws, w.name, w.generalId);
+        const { seat, started, token } = room.join(
+          w.ws, w.name, w.generalId, undefined, undefined, undefined, { deferStart: true },
+        );
         connRoom.set(w.ws, roomId);
         w.ws.send(
           JSON.stringify({
@@ -81,6 +84,7 @@ function tryMatch(): void {
         /* ignore */
       }
     });
+    room.startNow(); // 4 名真人已入座 → 现在开局（消息顺序：welcome → gameStarted）
   }
   broadcastMatching();
 }
