@@ -45,6 +45,7 @@ describe('引擎：摸打流转', () => {
 describe('引擎：和牌结算 + 沮授渐营', () => {
   it('连续三张同类弃牌 → 渐营 +3 番（示例序列）', () => {
     const s = dummyState();
+    s.awaiting = 'discard'; // tsumo 需处于打牌时机
     s.turnCount = 10; // 非首巡（避免触发天和）
     // 注入：seat0 的**未被鸣走**弃牌区有 5 张万 → 3 个同类窗口 → +3 番
     s.players[0].discards = [1, 2, 3, 4, 5];
@@ -64,6 +65,7 @@ describe('引擎：和牌结算 + 沮授渐营', () => {
 describe('引擎：关羽武圣（万面子加番）', () => {
   it('手牌万面子按拆解计入 → 3 番变 6 番（且技能数值被记录）', () => {
     const s = dummyState();
+    s.awaiting = 'discard'; // tsumo 需处于打牌时机
     const skillsOfMan = (seat: number) => (seat === 0 ? [wusheng] : []);
     s.turnCount = 10; // 非首巡（避免触发天和）
     // 123m 456m 789m 456p 白白：一气通贯+门清自摸 3 番，3 个万面子 → +3 → 6 番
@@ -190,6 +192,7 @@ describe('和牌事件携带牌型（供结算面板展示，和牌即公开）'
 
   it('荣和：手牌 13 张 + 和牌张 = 14 张', () => {
     const s = dummyState();
+    s.awaiting = 'discard'; // tsumo 需处于打牌时机
     s.players[0].hand = [1, 2, 3, 14, 15, 16, 24, 25, 26, 35, 35, 5, 5];
     s.lastDiscard = { player: 1, tile: 35 };
     const r = step(s, { type: 'ron', player: 0, tile: 35, from: 1 }, noSkills());
@@ -219,6 +222,7 @@ describe('引擎：飞人规则（雀魂）', () => {
 
   it('正常和牌不触发飞人', () => {
     const s = dummyState();
+    s.awaiting = 'discard'; // tsumo 需处于打牌时机
     // 注入真和牌：平和自摸
     s.players[0].hand = [1, 2, 4, 5, 6, 11, 12, 13, 14, 15, 16, 5, 5, 3];
     const r = step(s, { type: 'tsumo' }, noSkills());

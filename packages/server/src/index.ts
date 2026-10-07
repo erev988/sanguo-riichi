@@ -8,7 +8,11 @@ import { Room } from './room';
 // ============================================================================
 
 const PORT = Number(process.env.PORT ?? 8787);
-const wss = new WebSocketServer({ port: PORT, host: '0.0.0.0' });
+const wss = new WebSocketServer({
+  port: PORT,
+  host: '0.0.0.0',
+  maxPayload: 64 * 1024, // 限制单帧 64KB（默认 100MB，巨型 JSON 可拖垮进程）
+});
 const rooms = new Map<string, Room>();
 
 // ---------- 真人匹配队列（仅真人，不补 AI；凑满 4 人自动开局） ----------
@@ -51,7 +55,7 @@ function enqueueMatch(ws: WebSocket, name: string, generalId: string): void {
 function tryMatch(): void {
   while (matchQueue.length >= 4) {
     const group = matchQueue.splice(0, 4);
-    const roomId = `match-${Date.now().toString(36)}`;
+    const roomId = `match-${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
     const room = new Room(roomId, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`);
     rooms.set(roomId, room);
     group.forEach((w) => {
@@ -77,8 +81,24 @@ function tryMatch(): void {
   broadcastMatching();
 }
 
+// 房间回收：定期清理空房/全离线房（此前 rooms 只增不减，终局房永久驻留内存；
+// 打错房名产生的空房也会在这里被收走）
+setInterval(() => {
+  for (const [id, room] of rooms) {
+    if (room.canDispose()) rooms.delete(id);
+  }
+}, 60_000).unref();
+
 wss.on('connection', (ws: WebSocket) => {
+  // 简单限流：每条连接每秒最多 40 条消息（act/snapshot spam 会放大广播成本）
+  let msgCount = 0;
+  const rateTimer = setInterval(() => {
+    msgCount = 0;
+  }, 1000);
+  rateTimer.unref?.();
+
   ws.on('message', (raw) => {
+    if (++msgCount > 40) return; // 超限直接丢弃
     try {
       // zod 运行时校验（防篡改/畸形消息）
       const parsed = ClientMsgSchema.safeParse(JSON.parse(raw.toString()));
@@ -88,10 +108,12 @@ wss.on('connection', (ws: WebSocket) => {
       }
       const msg = parsed.data;
 
-      if (msg.t === 'join') {        const { roomId, name, generalId, rules, token, password } = msg.payload;
+      if (msg.t === 'join') {
+        const { roomId, name, generalId, rules, token, password } = msg.payload;
         let room = rooms.get(roomId);
         if (!room) {
-          room = new Room(roomId, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`);
+          // 输入房号即开房（打错房名产生的空房由定期回收 + 列表过滤兜住）
+          room = new Room(roomId, `${randomBytes(32).toString("hex")}:${randomBytes(16).toString("hex")}`);
           rooms.set(roomId, room);
         }
         try {
@@ -133,7 +155,18 @@ wss.on('connection', (ws: WebSocket) => {
           }),
         );
       } else if (msg.t === 'rooms') {
-        ws.send(JSON.stringify({ t: 'rooms', rooms: [...rooms.values()].map((r) => r.info()) }));
+        // 只列出有人的房间（打错房名产生的空房不污染大厅）
+        ws.send(
+          JSON.stringify({
+            t: 'rooms',
+            rooms: [...rooms.values()]
+              .filter((r) => {
+                const i = r.info();
+                return i.humans + i.ais > 0;
+              })
+              .map((r) => r.info()),
+          }),
+        );
       } else if (msg.t === 'match') {
         enqueueMatch(ws, (msg as { name: string }).name, (msg as { generalId: string }).generalId);
       } else if (msg.t === 'clientSeed') {

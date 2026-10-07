@@ -54,6 +54,8 @@ export class Room {
   private thinkTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** 各座位当前决策点的计时截止时间（用于防止点击按钮重置计时） */
   private thinkDeadline = new Map<number, number>();
+  /** 各座位计时对应的决策点标识：同一决策点内保持剩余时间，跨决策点必须重新计时 */
+  private thinkKey = new Map<number, string>();
   /** 本局内已超时过的座位：之后思考时限改为 10s（新局重置） */
   private timedOutPlayers = new Set<number>();
   private ronTimer?: ReturnType<typeof setTimeout>;
@@ -138,6 +140,14 @@ export class Room {
   }
 
   /** 房间摘要（供房间列表） */
+  /** 是否可回收：没有任何成员（或全部离线且未开局）—— 由服务器定期清理 */
+  canDispose(): boolean {
+    if (this.members.size === 0 && this.sockets.size === 0) return true;
+    // 已结束且无任何在线连接的房间
+    const anyOnline = [...this.members.values()].some((m) => !!m.ws);
+    return !anyOnline && this.sockets.size === 0;
+  }
+
   /** 第一个仍在座的真人座位（房主转让用；无则 -1） */
   private firstHumanSeat(): number {
     for (const [seat, m] of this.members) {
@@ -332,7 +342,17 @@ export class Room {
   private startThinkTimer(seat: number, opts?: { response?: boolean }): void {
     const now = Date.now();
     const existing = this.thinkDeadline.get(seat);
-    if (existing != null && existing > now) return; // 该决策点已在计时 → 保持剩余时间
+    // ★ 决策点标识：响应窗口（要不要吃碰）与 打牌决策 是两个不同的决策点，
+    //   此前只比较时间戳 → 碰完之后进入打牌会继承响应窗口的残余秒数（如只剩 12s）
+    const key = [
+      this.state?.version ?? 0,
+      this.state?.awaiting,
+      this.state?.current,
+      this.state?.lastDiscard ? 1 : 0,
+      this.state?.pendingKakan ? 1 : 0,
+      seat,
+    ].join(':');
+    if (this.thinkKey.get(seat) === key && existing != null && existing > now) return;
     this.clearThinkTimer(seat);
     const TOTAL = this.timedOutPlayers.has(seat) ? 10_000 : opts?.response ? 12_000 : 35_000;
     const deadline = now + TOTAL;
@@ -356,6 +376,7 @@ export class Room {
       }
     }, TOTAL);
     this.thinkTimers.set(seat, t);
+    this.thinkKey.set(seat, key);
   }
 
   private clearThinkTimer(seat?: number): void {
@@ -363,12 +384,14 @@ export class Room {
       for (const t of this.thinkTimers.values()) clearTimeout(t);
       this.thinkTimers.clear();
       this.thinkDeadline.clear();
+      this.thinkKey.clear();
       return;
     }
     const t = this.thinkTimers.get(seat);
     if (t) clearTimeout(t);
     this.thinkTimers.delete(seat);
     this.thinkDeadline.delete(seat);
+    this.thinkKey.delete(seat);
   }
 
   /** 给每位真人单播其当前可执行动作（AI 不需要）；需要决策的座位起思考计时 */

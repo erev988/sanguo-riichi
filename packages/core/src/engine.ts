@@ -156,7 +156,8 @@ export function legalActions(s: GameState): Action[] {
     acts.push({ type: 'pass' });
   }
 
-  if (s.awaiting === 'draw') {
+  // 响应窗口（有人刚打出牌/被杠）期间不能摸牌：此时不应下发 draw（否则按钮点了必被拒）
+  if (s.awaiting === 'draw' && !s.lastDiscard && !s.pendingKakan) {
     if (s.wall.length > 0) acts.push({ type: 'draw' });
     // 九种九牌：自己这一巡尚未打过牌，且无人副露，幺九种类 ≥ 9
     if (
@@ -309,6 +310,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
     }
 
     case 'tsumo': {
+      if (s.awaiting !== 'discard') return fail('现在不是自摸时机'); // 此前仅靠 calcWin 兜底
       const winner = s.current;
       const hand = s.players[winner].hand;
       const agariPai = hand[hand.length - 1]; // 摸牌在末尾
@@ -530,6 +532,7 @@ export function step(state: GameState, action: Action, opts: StepOptions): StepR
       s.current = me;
       s.awaiting = 'discard'; // 副露后直接进入打牌
       clearIppatsu(s); // 鸣牌打断一发
+      s.isHaitei = false; // ★ 海底牌被鸣走 → 海底摸月/河底捞鱼失效
       effects.push({ type: 'called', player: me, from: disc.player, meld, handCount: p.hand.length });
       // ★ 大明杠：补岭上牌 + 翻开新宝牌（此前遗漏 → 手牌数错乱、永远无法和牌）
       if (action.type === 'kan') {
