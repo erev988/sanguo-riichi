@@ -138,6 +138,14 @@ export class Room {
   }
 
   /** 房间摘要（供房间列表） */
+  /** 第一个仍在座的真人座位（房主转让用；无则 -1） */
+  private firstHumanSeat(): number {
+    for (const [seat, m] of this.members) {
+      if (!m.isAI && m.ws) return seat;
+    }
+    return -1;
+  }
+
   info(): { id: string; humans: number; ais: number; started: boolean; locked: boolean } {
     const members = [...this.members.values()];
     return {
@@ -197,7 +205,20 @@ export class Room {
       //   否则新连接收不到任何广播、座位被 AI 接管（幽灵会话）
       if (m.ws !== ws) return;
       m.ws = undefined;
-      if (this.started) m.isAI = true; // 断线后由 AI 托管
+      if (this.started) {
+        m.isAI = true; // 局中：AI 托管
+      } else {
+        // ★ 未开局：给 30 秒宽限期（刷新页面/切后台可凭 token 复座），
+        //   超时仍未回来才移除并转让房主 —— 既不留幽灵座位，也不误伤正常重连
+        setTimeout(() => {
+          const cur = this.members.get(seat);
+          if (!this.started && cur && !cur.ws) {
+            this.members.delete(seat);
+            if (this.hostSeat === seat) this.hostSeat = this.firstHumanSeat();
+            this.broadcastRoom();
+          }
+        }, 30000);
+      }
     }
     this.scheduleAI();
   }
@@ -485,7 +506,9 @@ export class Room {
 
   /** 玩家贡献随机数（本局定牌前有效） */
   handleClientSeed(ws: WebSocket, seed: string): void {
-    if (this.state?.phase === 'playing') return; // 本局已定牌，忽略
+    // ★ 局中也必须接受：下一局的种子承诺（seedCommit）是在本局进行中广播的，
+    //   若在 playing 期间丢弃，第 2 局起的盐就只能由服务器代生成（provably-fair 半失效）。
+    //   本局的盐早在开局时已快照用完，局中收集到的都属于「下一局」。
     for (const [seat, m] of this.members) {
       if (m.ws === ws) {
         this.clientSeeds.set(seat, seed);

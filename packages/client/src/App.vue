@@ -408,6 +408,9 @@ function handleEffect(e: GameEffect): void {
       if (e.player === mySeat.value) lastDrawn.value = e.tile;
       break;
     case 'discarded': {
+      // ★ 自己（可能被超时自动摸切）打牌后，立直宣言模式必须清除，
+      //   否则下一巡点任意牌都会带 riichi 标志（不听则整次被拒，听则被迫立直扣 1000）
+      if (e.player === mySeat.value) riichiMode.value = false;
       const d = [...(discards.value[e.player] ?? []), e.tile];
       discards.value[e.player] = d;
       handCounts.value[e.player] = e.handCount;
@@ -427,6 +430,16 @@ function handleEffect(e: GameEffect): void {
       break;
     }
     case 'called': {
+      // ★ 加杠（kakan）是对已有「碰」的升级：必须替换，不能追加（否则显示 3+4=7 张）
+      if (e.meld.type === 'kakan') {
+        const list = [...(melds.value[e.player] ?? [])];
+        const i = list.findIndex((m) => m.type === 'pon' && m.tiles[0] === e.meld.tiles[0]);
+        if (i >= 0) {
+          list[i] = e.meld;
+          melds.value[e.player] = list;
+          break;
+        }
+      }
       melds.value[e.player] = [...(melds.value[e.player] ?? []), e.meld];
       handCounts.value[e.player] = e.handCount;
       const d = [...(discards.value[e.from] ?? [])];
@@ -593,6 +606,17 @@ function handleMsg(msg: ServerMsg): void {
       wallCount.value = st.wall?.length ?? 0;
       [roundText.value, honbaText.value] = roundLabel(st.round);
       roomStarted.value = true;
+      // ★ 重置本地 UI 态：摸牌中掉线（AI 代打）后重连时，残留的
+      //   lastDrawn/结算卷轴/选项会造成「幻影牌」「停在上一局的终局画面」
+      lastDrawn.value = null;
+      myOptions.value = [];
+      riichiMode.value = false;
+      pendingDiscard.value = null;
+      timerEnd.value = 0;
+      if (st.phase !== 'ended') {
+        ended.value = false;
+        result.value = null;
+      }
       break;
     }
     case 'error':
