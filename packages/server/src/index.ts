@@ -1,5 +1,6 @@
 import { ClientMsgSchema, PROTOCOL_VERSION } from '@sanguo/shared';
 import { WebSocket, WebSocketServer } from 'ws';
+import { randomBytes } from 'node:crypto';
 import { Room } from './room';
 
 // ============================================================================
@@ -51,7 +52,7 @@ function tryMatch(): void {
   while (matchQueue.length >= 4) {
     const group = matchQueue.splice(0, 4);
     const roomId = `match-${Date.now().toString(36)}`;
-    const room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
+    const room = new Room(roomId, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`);
     rooms.set(roomId, room);
     group.forEach((w) => {
       try {
@@ -89,7 +90,7 @@ wss.on('connection', (ws: WebSocket) => {
       if (msg.t === 'join') {        const { roomId, name, generalId, rules, token, password } = msg.payload;
         let room = rooms.get(roomId);
         if (!room) {
-          room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
+          room = new Room(roomId, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`);
           rooms.set(roomId, room);
         }
         try {
@@ -115,7 +116,7 @@ wss.on('connection', (ws: WebSocket) => {
           ws.send(JSON.stringify({ t: 'error', code: 'room-exists' }));
           return;
         }
-        const room = new Room(roomId, Math.floor(Math.random() * 2 ** 31));
+        const room = new Room(roomId, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`);
         rooms.set(roomId, room);
         const { seat, started } = room.join(ws, name, generalId, rules, undefined, password);
         ws.send(

@@ -19,6 +19,7 @@ import {
   type SeatInfo,
   type Skill,
 } from '@sanguo/core';
+import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
 
 interface RoomMember {
@@ -49,7 +50,7 @@ export class Room {
   /** 房间密码（房主设置；空串表示无密码） */
   private password = '';
   // ---- 录像：记录动作序列即可完整重放（引擎为纯函数） ----
-  private meta?: { seats: SeatConfig[]; rules: Rules; seed: number };
+  private meta?: { seats: SeatConfig[]; rules: Rules; seed: string };
   private rounds: ReplayRound[] = [];
   private currentActions: { seat: number; action: Action }[] = [];
   private roundStart?: { round: RoundInfo; dealer: number };
@@ -66,7 +67,8 @@ export class Room {
 
   constructor(
     id: string,
-    private seed: number,
+    /** 发牌种子（128 位 hex，由服务器用 crypto 随机生成） */
+    private seed: string,
     /** 真人起房人数：达到即开局，其余空位自动补 AI */
     private minPlayers = 2,
   ) {
@@ -476,6 +478,12 @@ export class Room {
     // 牌山打码为占位（保留张数信息，不泄露内容）
     s.wall = s.wall.map(() => -1);
     s.rinshanWall = s.rinshanWall.map(() => -1);
+    s.uraIndicators = s.uraIndicators.map(() => -1); // 里宝牌指示牌同样保密
+    s.seed = ''; // ★ 绝不下发发牌种子：否则客户端可据此推演整副牌（防破解）
+    // ★ 只保留自己的手牌；他人手牌打码为占位（保留张数信息，不泄露内容）
+    s.players = s.players.map((p, i) =>
+      i === seat ? p : { ...p, hand: p.hand.map(() => -1) },
+    );
     const m = this.members.get(seat);
     m?.ws?.send(JSON.stringify({ t: 'snapshot', state: s }));
     // 快照之后补发当前可选项（断线重连/从后台返回时不会错过 options 广播）
@@ -548,7 +556,7 @@ export class Room {
     clearTimeout(this.nextTimer);
     this.nextTimer = setTimeout(() => {
       if (!this.state) return;
-      const next = advanceRound(this.state);
+      const next = advanceRound(this.state, `${randomBytes(32).toString('hex')}:${randomBytes(16).toString('hex')}`); // 每局独立 128 位种子
       if (next === this.state) return; // 整场结束
       this.state = next;
       this.roundStart = { round: next.round, dealer: next.dealer };

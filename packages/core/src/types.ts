@@ -1,3 +1,4 @@
+import { sha256Hex, sha256Rng } from './sha256';
 // ============================================================================
 // 牌与状态基础类型
 // 编码采用 riichi-core 的 6-bit 方案（0..37）：
@@ -181,7 +182,8 @@ export interface GameState {
   lastResult?: { winners: number[]; tenpai: boolean[] };
   /** 本局规则（初始点数 / 返点 / 切上满贯） */
   rules: Rules;
-  seed: number;
+  /** 本局发牌输入 = `服务器种子:盐`（局中保密；回放数据里保留以便验证与复现） */
+  seed: string;
 }
 
 export interface SeatConfig {
@@ -191,6 +193,39 @@ export interface SeatConfig {
 }
 
 // ---- 随机（确定性洗牌，服务端种子驱动，可回放） ----
+
+/**
+ * 洗牌随机源：SHA-256(种子+盐) 计数器流，密码学安全且确定性。
+ * 相同 (服务器种子, 盐) → 永远同一副牌序（可复现 / 可验证）；
+ * 局中种子保密 → 无法从已见牌推出后续牌序（不可枚举）。
+ */
+export function rngFromSeed(seed: string): () => number {
+  return sha256Rng(seed);
+}
+
+/** 把 number / string 种子统一成 32 位 hex 字符串（number 仅测试用，展开为 128 位） */
+export function normalizeSeed(seed?: number | string): string {
+  if (typeof seed === 'string') return seed;
+  if (typeof seed === 'number') {
+    let s = seed >>> 0;
+    let out = '';
+    for (let i = 0; i < 4; i++) {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      out += ((t ^ (t >>> 14)) >>> 0).toString(16).padStart(8, '0');
+    }
+    return out;
+  }
+  return '00000000000000000000000000000001'; // 兜底
+}
+
+/** 由旧种子派生新种子（确定性；128 位不可枚举，用于每局独立发牌） */
+export function deriveSeed(seed: string): string {
+  return sha256Hex(`${seed}:next-round`);
+}
+
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {

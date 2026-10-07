@@ -27,7 +27,8 @@ export interface ReplayData {
   createdAt: number;
   seats: SeatConfig[];
   rules: Rules;
-  seed: number;
+  /** 发牌种子（128 位 hex；保存以便验证/复现整局） */
+  seed: number | string;
   rounds: ReplayRound[];
 }
 

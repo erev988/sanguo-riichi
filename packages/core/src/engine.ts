@@ -7,7 +7,9 @@ import { calcTenpai, calcTenpaiWithMelds } from './tenpai';
 import { resolveRules, type Rules } from './rules';
 import {
   buildWall,
-  mulberry32,
+  deriveSeed,
+  normalizeSeed,
+  rngFromSeed,
   type GameState,
   type Meld,
   type PlayerState,
@@ -41,10 +43,10 @@ export { doraFromIndicator, countDora, countAka } from './types';
 
 export function createGame(
   seats: SeatConfig[],
-  opts: { seed?: number; round?: RoundInfo; initialScore?: number; rules?: Partial<Rules> } = {},
+  opts: { seed?: number | string; round?: RoundInfo; initialScore?: number; rules?: Partial<Rules> } = {},
 ): GameState {
-  const seed = opts.seed ?? 20240101;
-  const rng = mulberry32(seed);
+  const seed = normalizeSeed(opts.seed);
+  const rng = rngFromSeed(seed);
   const all = buildWall(rng);
   const rules = resolveRules(opts.rules);
   // 配牌 52 张后，余下 84 张中拆出「王牌」14 张：岭上 4 + 宝牌指示牌 5 + 里宝牌指示牌 5
@@ -831,7 +833,7 @@ function finish(s: GameState, effects: GameEffect[], reason: 'normal' | 'ryukyok
  * - 否则进庄（庄家移下家、局数推进、本场归 0）
  * - 飞人 / 南 4 局结束 → 返回原状态（表示整场结束）
  */
-export function advanceRound(s: GameState): GameState {
+export function advanceRound(s: GameState, newSeed?: string): GameState {
   if (s.phase !== 'ended') return s;
   if (s.reason === 'tobi') return s;
   const res = s.lastResult;
@@ -857,7 +859,13 @@ export function advanceRound(s: GameState): GameState {
   const nextDealer = renchan ? dealer : (dealer + 1) % 4;
 
   const seats: SeatConfig[] = s.players.map((p) => ({ name: p.name, generalId: p.generalId, isAI: p.isAI }));
-  const next = createGame(seats, { seed: s.seed + s.turnCount + 1, round, initialScore: 0, rules: s.rules });
+  // 每局独立发牌：优先用服务器提供的新种子，否则从旧种子确定性派生（128 位，不可枚举）
+  const next = createGame(seats, {
+    seed: newSeed ?? deriveSeed(s.seed),
+    round,
+    initialScore: 0,
+    rules: s.rules,
+  });
   next.players.forEach((p, i) => {
     p.score = s.players[i].score;
   });
