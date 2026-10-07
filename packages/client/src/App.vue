@@ -121,7 +121,10 @@ const remainSec = computed(() => {
 /** 是否进入补时（最后 10 秒） */
 const inExtraTime = computed(() => {
   if (remainSec.value == null) return false;
-  return Math.max(0, timerEnd.value - nowTick.value) <= 10000;
+  const left = Math.max(0, timerEnd.value - nowTick.value);
+  // ★ 按本次计时总长的 30% 判定补时（最小 5s）：响应窗口只有 12s 时不再整段变红
+  const total = timerTotal.value > 0 ? timerTotal.value : 35000;
+  return left <= Math.max(5000, total * 0.3);
 });
 
 // ---- 结算面板 ----
@@ -481,6 +484,7 @@ function handleEffect(e: GameEffect): void {
       break;
     }
     case 'passed':
+      myOptions.value = []; // ★ 窗口已关（可能是别人 pass 关掉的），清掉残留按钮
       pendingDiscard.value = null;
       break;
     case 'scores':
@@ -542,8 +546,7 @@ function handleEffect(e: GameEffect): void {
       break;
     }
     case 'gameEnded':
-      ended.value = true;
-      reason.value = e.reason === 'tobi' ? '飞人终局' : e.reason === 'ryukyoku' ? '荒牌流局' : '和了终局';
+      // ★ 这只是「本局结束」：不能把界面锁死（此前每局都闪终局横幅并锁操作）
       scores.value = e.scores;
       break;
   }
@@ -599,6 +602,7 @@ function handleMsg(msg: ServerMsg): void {
       discards.value = st.players.map((p) => [...p.discards]);
       melds.value = st.players.map((p) => [...p.openMelds]);
       riichiFlags.value = st.players.map((p) => p.log.riichi);
+      riichiLockBy.value = (st as { riichiLockBy?: number }).riichiLockBy ?? null;
       currentSeat.value = st.current;
       riichiSticks.value = st.riichiSticks;
       dealer.value = st.dealer;
@@ -628,8 +632,19 @@ function handleMsg(msg: ServerMsg): void {
       } else if (msg.code === 'join-failed') {
         joinedRoom = '';
         status.value = '加入失败（房间可能已开局或已满）';
+      } else if (msg.code === 'bad-message') {
+        status.value = '输入不合法（昵称/房间名过长？）';
+      } else if (msg.code === 'illegal-action') {
+        // P1-16 配套：非法操作有明确回执，不再「点了没反应」
+        pushLog(`操作被拒绝：${msg.message ?? ''}`);
       }
       pushLog(`错误：${msg.code}`);
+      break;
+    case 'matchEnded':
+      ended.value = true;
+      reason.value = '本场结束';
+      scores.value = msg.scores;
+      result.value = null;
       break;
     case 'pong':
       break;
@@ -835,9 +850,14 @@ const visibleOptions = computed(() =>
 const riichiMode = ref(false);
 
 /** 当前能否立直（门清、未立直、14 张、且存在打出后即听牌的牌） */
+/** 立直封锁者（妄尊：先制立直后他人不能立直） */
+const riichiLockBy = ref<number | null>(null);
+
 const canRiichiNow = computed(() => {
   const me = mySeat.value;
   if (me == null || ended.value) return false;
+  // ★ 被「妄尊」封锁时不该显示立直按钮（此前点了会被整次静默吞掉）
+  if (riichiLockBy.value != null && riichiLockBy.value !== me) return false;
   const h = shown.value.hands[me] ?? [];
   if (h.length !== 14) return false;
   if (shown.value.riichi[me]) return false;

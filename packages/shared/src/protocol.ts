@@ -138,13 +138,15 @@ export type ServerMsg =
   /** 房间成员状态（供大厅显示人数/AI 数、开始按钮） */
   | { t: 'room'; members: RoomMemberInfo[]; hostSeat: number; started: boolean }
   | { t: 'rooms'; rooms: RoomInfo[] }
+  /** 整场对局结束（与每局的 gameEnded 区分：那个只是本局结束） */
+  | { t: 'matchEnded'; scores: number[] }
   /** 匹配中（尚未凑满 4 名真人） */
   | { t: 'matching'; waiting: number }
   /** 服务器对本局种子（+盐）的承诺哈希：开局前公布，局后可用公开值验证未被篡改 */
   | { t: 'seedCommit'; commit: string }
   | { t: 'events'; effects: GameEffect[]; revision: number }
   | { t: 'snapshot'; state: GameState }
-  | { t: 'error'; code: string; seq?: number }
+  | { t: 'error'; code: string; /** 人类可读的补充说明（如非法动作的具体原因） */ message?: string; seq?: number }
   | { t: 'pong' };
 
 export { type Action, type GameEffect, type GameState, type SeatInfo, type Rules, type SeatConfig };

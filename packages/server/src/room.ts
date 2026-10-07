@@ -504,6 +504,12 @@ export class Room {
   }
 
   /** 安全发送：socket 已断时 ws 库会同步抛错，兜住后按断线处理（否则 uncaughtException 崩服） */
+  /** 广播一条非游戏事件消息（如整场结束） */
+  private broadcastAll(msg: Record<string, unknown>): void {
+    const payload = JSON.stringify(msg);
+    for (const m of this.members.values()) this.safeSend(m.ws, payload);
+  }
+
   private safeSend(ws: WebSocket | undefined | null, payload: string): void {
     if (!ws) return;
     try {
@@ -631,6 +637,9 @@ export class Room {
     );
     const m = this.members.get(seat);
     this.safeSend(m?.ws, JSON.stringify({ t: 'snapshot', state: s }));
+    // ★ 重连后重置该座位计时，让 broadcastOptions 重新下发 timer
+    //   （否则客户端有按钮但没读秒，到点服务端却自动打牌 → 「牌自己飞出去」）
+    this.clearThinkTimer(seat);
     // 快照之后补发当前可选项（断线重连/从后台返回时不会错过 options 广播）
     this.broadcastOptions();
   }
@@ -700,7 +709,12 @@ export class Room {
       const { salt, clientSeeds } = this.computeSalt();
       const serverSeed = this.roundServerSeed;
       const next = advanceRound(this.state, `${serverSeed}:${salt}`);
-      if (next === this.state) return; // 整场结束
+      if (next === this.state) {
+        // ★ 整场结束（advanceRound 表示无法继续）→ 单独通知，客户端据此显示总榜
+        //   每局的 gameEnded 只是「本局结束」，不应把界面锁死
+        this.broadcastAll({ t: 'matchEnded', scores: this.state.players.map((p) => p.score) });
+        return;
+      }
       this.state = next;
       this.timedOutPlayers.clear(); // 新局：重置超时标记
       this.lastDeal = { serverSeed, clientSeeds, salt }; // 同样留到下一局结束再公开
