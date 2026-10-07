@@ -12,6 +12,8 @@ import {
 import { PROTOCOL_VERSION, type RoomInfo, type ServerMsg } from '@sanguo/shared';
 import { calcTenpaiWithMelds } from '@sanguo/core';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import CornerInfo from './components/CornerInfo.vue';
+import LogBar from './components/LogBar.vue';
 import TileSprite from './components/TileSprite.vue';
 import { Net } from './net';
 import { Sfx } from './sfx';
@@ -98,8 +100,6 @@ const honbaText = ref('');
 const honba = ref(0);
 const riichiSticks = ref(0);
 const logs = ref<string[]>([]);
-/** 战报条展开态（默认收起只显示最新一条） */
-const logOpenState = ref(false);
 const ended = ref(false);
 const reason = ref('');
 const pendingDiscard = ref<{ player: number; tile: Tile; chankan: boolean } | null>(null);
@@ -1118,7 +1118,7 @@ onBeforeUnmount(() => {
     <div class="toasts">
       <span v-for="t in toasts" :key="t.id" class="toast">{{ t.text }}</span>
     </div>
-    <h1>三国麻雀</h1>
+    <h1 v-if="!roomStarted">三国麻雀</h1>
 
     <!-- 未连接 -->
     <!-- 未连接：玩家设置 + 连接 -->
@@ -1212,34 +1212,16 @@ onBeforeUnmount(() => {
       <!-- 牌桌 -->
       <div v-else class="table">
         <!-- 左上角：宝牌指示牌 + 场供 -->
-        <div class="corner">
-          <span class="corner-label">宝牌</span>
-          <span class="corner-tiles">
-            <TileSprite v-for="(t, i) in doraIndicators" :key="i" :tile="t" :size="26" />
-          </span>
-          <span class="corner-sep" />
-          <span class="corner-label">供托</span>
-          <span class="corner-val">{{ shown.riichiSticks * 1000 }}</span>
-          <span class="corner-sep" />
-          <span class="corner-label">场供</span>
-          <span class="corner-val">{{ honba * 300 }}</span>
-          <span v-if="honba > 0" class="corner-sub">{{ honba }} 本场</span>
-          <button
-            class="mini sound-toggle"
-            :title="soundOn ? '关闭音效' : '开启音效'"
-            @click="soundOn = !soundOn"
-          >
-            {{ soundOn ? '🔊' : '🔇' }}
-          </button>
-        </div>
+        <CornerInfo
+          :dora-indicators="doraIndicators"
+          :riichi-sticks="shown.riichiSticks"
+          :honba="honba"
+          :sound-on="soundOn"
+          @update:sound-on="soundOn = $event"
+        />
 
         <!-- 战报条（报告 P1-4：logs 数据早已存在但模板零渲染，错误与吃碰杠全无处可见） -->
-        <div v-if="logs.length" class="log-bar" @click="logOpenState = !logOpenState">
-          <span class="log-line">📜 {{ logs[0] }}</span>
-          <div v-if="logOpenState" class="log-list">
-            <div v-for="(l, i) in logs.slice(0, 20)" :key="i">{{ l }}</div>
-          </div>
-        </div>
+        <LogBar :logs="logs" />
 
         <!-- 对家：横排，整体居中 -->
         <section class="seat top" :class="{ turn: shown.current === seats.top }">
@@ -1300,7 +1282,18 @@ onBeforeUnmount(() => {
               >
             </span>
           </div>
-        </section>
+                    <div class="river-left river-grid-v">
+                          <TileSprite
+                            v-for="(t, i) in shown.discards[seats.left]"
+                            :key="i"
+                            :tile="t"
+                            :rotated="shown.riichiDiscardIdx[seats.left] === i"
+                            :size="tileRiverSize"
+                            :class="{ last: isLastDiscard(seats.left, i) }"
+                            dim
+                          />
+                        </div>
+          </section>
 
         <!-- 中央：方块（点数 + 风位）四周环绕牌河 -->
         <section class="center">
@@ -1316,17 +1309,7 @@ onBeforeUnmount(() => {
             />
           </div>
           <div class="river-mid">
-            <div class="river-left river-grid-v">
-              <TileSprite
-                v-for="(t, i) in shown.discards[seats.left]"
-                :key="i"
-                :tile="t"
-                :rotated="shown.riichiDiscardIdx[seats.left] === i"
-                :size="tileRiverSize"
-                :class="{ last: isLastDiscard(seats.left, i) }"
-                dim
-              />
-            </div>
+            
             <div class="core">
               <span class="core-cell" :class="{ active: currentSeat === seats.top }">
                 <em class="w">{{ windOf(seats.top) }}</em>{{ fmtScore(shown.scores[seats.top]) }}
@@ -1363,17 +1346,7 @@ onBeforeUnmount(() => {
                 <em class="w">{{ windOf(seats.self) }}</em>{{ fmtScore(shown.scores[seats.self]) }}
               </span>
             </div>
-            <div class="river-right river-grid-v">
-              <TileSprite
-                v-for="(t, i) in shown.discards[seats.right]"
-                :key="i"
-                :tile="t"
-                :rotated="shown.riichiDiscardIdx[seats.right] === i"
-                :size="tileRiverSize"
-                :class="{ last: isLastDiscard(seats.right, i) }"
-                dim
-              />
-            </div>
+            
           </div>
           <!-- 立直棒实体化（报告 P1-3）：每根 1000 点，摆在自家河前方 -->
           <div v-if="shown.riichiSticks > 0" class="riichi-sticks">
@@ -1423,7 +1396,18 @@ onBeforeUnmount(() => {
               </span>
             </span>
           </div>
-        </section>
+                    <div class="river-right river-grid-v">
+                          <TileSprite
+                            v-for="(t, i) in shown.discards[seats.right]"
+                            :key="i"
+                            :tile="t"
+                            :rotated="shown.riichiDiscardIdx[seats.right] === i"
+                            :size="tileRiverSize"
+                            :class="{ last: isLastDiscard(seats.right, i) }"
+                            dim
+                          />
+                        </div>
+          </section>
 
         <!-- 上层：自己的手牌层（副露 + 手牌 + 倒计时，与下方牌河分层） -->
         <section class="seat self" :class="{ turn: shown.current === seats.self }">

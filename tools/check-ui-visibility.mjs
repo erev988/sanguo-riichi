@@ -19,12 +19,36 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const cssPath = path.join(root, 'packages/client/src/style.css');
+const stylesDir = path.join(root, 'packages/client/src/styles');
+/** 按入口 @import 顺序合并（顺序即层叠优先级） */
+const cssPath = path.join(stylesDir, 'index.css');
 const appPath = path.join(root, 'packages/client/src/App.vue');
-const cssRaw = fs.readFileSync(cssPath, 'utf8');
+/** 按 index.css 的 @import 顺序合并各文件（未拆分时兼容单文件） */
+function loadCss() {
+  if (!fs.existsSync(cssPath)) return fs.readFileSync(path.join(root, 'packages/client/src/style.css'), 'utf8');
+  const entry = fs.readFileSync(cssPath, 'utf8');
+  const files = [...entry.matchAll(/@import\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  if (files.length === 0) return entry;
+  return files
+    .map((f) => fs.readFileSync(path.join(stylesDir, f), 'utf8'))
+    .join('\n');
+}
+const cssRaw = loadCss();
 /** 剥离注释后再断言（注释里提到 padding-bottom:106px 不应算违规） */
 const css = cssRaw.replace(/\/\*[\s\S]*?\*\//g, '');
-const app = fs.readFileSync(appPath, 'utf8');
+/** 全部 .vue 源码（模板存在性检查需覆盖子组件） */
+function loadVueSources() {
+  const dirs = [path.join(root, 'packages/client/src'), path.join(root, 'packages/client/src/components')];
+  let out = '';
+  for (const d of dirs) {
+    if (!fs.existsSync(d)) continue;
+    for (const f of fs.readdirSync(d)) {
+      if (f.endsWith('.vue')) out += fs.readFileSync(path.join(d, f), 'utf8');
+    }
+  }
+  return out;
+}
+const app = loadVueSources();
 
 let fails = 0;
 const check = (name, ok, detail = '') => {

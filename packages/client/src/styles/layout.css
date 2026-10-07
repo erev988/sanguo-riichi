@@ -1,0 +1,123 @@
+/* ============================================================================
+   §9 布局根治 + §9.3 改造 2（侧栏承载侧家信息）
+   —— 本文件是当前生效的「权威层」：新增/修改样式请写在这里
+   ========================================================================== */
+/* ============================================================================
+   §9 布局根治（复测报告 R-3/R-5）：不再靠「硬编码让位 + 深色遮罩」，
+   改为「行高由内容决定 + 信息区不裁剪 + 遮罩只留手牌正后方一圈」
+   ========================================================================== */
+
+/* 三行：对家区(auto) / 中央区(占满剩余) / 自家区(auto 由内容撑开)
+   —— 删掉 padding-bottom:106px 的「祈祷式让位」（它比手牌层实际高度少 12px） */
+.table {
+  position: relative;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 8px;
+  gap: 5px;
+}
+
+/* 信息区一律不裁剪（任何 overflow:hidden 出现在信息区都是 bug 种子） */
+.seat {
+  overflow: visible;
+}
+
+/* 删掉深色大面积遮罩（0.4→0.6 的黑盖在 28px 牌河上等于不可见） */
+.seat.self::before {
+  display: none;
+}
+
+/* 手牌区改为「手牌正后方一圈」的轻微衬托，透明度 ≤0.3（§9.2 原则 3） */
+.seat.self {
+  background: radial-gradient(
+    closest-side,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.12) 62%,
+    transparent 100%
+  );
+  border-radius: 8px;
+}
+
+/* 自家区上缘加一条黄铜分隔线，替代原先靠遮罩表达的「悬浮感」 */
+.seat.self::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, 0.35), transparent);
+}
+
+/* 小视口整体缩放（§9.3 改造 4）：不够高就等比缩小，而不是裁掉某一区域 */
+@media (max-height: 470px) {
+  .table {
+    transform: scale(0.94);
+    transform-origin: center center;
+  }
+}
+
+@media (max-height: 420px) {
+  .table {
+    transform: scale(0.88);
+  }
+}
+
+/* R-5：侧家牌背提亮（此前 16px 深绿贴暗底几乎不可辨） */
+.backs-v .back-side,
+.back-side {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.09) 0 3px, transparent 3px 6px),
+    linear-gradient(160deg, #6d8f74, #46604f 55%, #364a3c);
+  border: 1px solid rgba(233, 226, 211, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  min-width: 12px;
+}
+
+/* ============================================================================
+   §9.3 改造 2：侧家信息（牌背 + 副露 + 牌河）占用左右侧栏，中央区只留方块与上下河
+   —— 侧栏此前除一行小字外纯黑空置约 30% 桌宽，而中央方框内挤作一团
+   ========================================================================== */
+
+.table {
+  grid-template-columns: minmax(150px, 1.05fr) minmax(240px, 1.7fr) minmax(150px, 1.05fr);
+}
+
+/* 中央区：只剩「对家河 / 方块 / 自家河」三段，方块居中 */
+.river-mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 0;
+  overflow: visible;
+}
+
+/* 侧家内部：副露 → 牌背 → 牌河 自上而下，占满侧栏高度 */
+.seat.left,
+.seat.right {
+  justify-content: center;
+  gap: 4px;
+}
+
+.seat.left .v-stack,
+.seat.right .v-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  min-height: 0;
+  width: 100%;
+  overflow: visible;
+}
+
+/* 侧栏里的牌河：更宽松的网格，6 行一列、列向右/左生长（沿用 v2 规则） */
+.seat.left .river-left,
+.seat.right .river-right {
+  max-width: 100%;
+}
+
+/* 侧栏牌背竖排：贴边、留白一致 */
+.seat.left .backs-v,
+.seat.right .backs-v {
+  align-items: center;
+}

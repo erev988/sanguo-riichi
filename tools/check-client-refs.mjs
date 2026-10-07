@@ -12,10 +12,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const files = [
-  'packages/client/src/App.vue',
-  'packages/client/src/components/TileSprite.vue',
-];
+/** 扫描全部 .vue（含 components/），避免新增子组件漏检 */
+import { readdirSync } from 'node:fs';
+const files = ['packages/client/src/App.vue'];
+const compDir = 'packages/client/src/components';
+try {
+  for (const f of readdirSync(path.join(root, compDir))) {
+    if (f.endsWith('.vue')) files.push(`${compDir}/${f}`);
+  }
+} catch {
+  /* ignore */
+}
 
 const RESERVED = new Set([
   'true', 'false', 'null', 'undefined', 'new', 'typeof', 'in', 'of', 'instanceof', 'void', 'delete',
