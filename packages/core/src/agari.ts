@@ -175,7 +175,11 @@ export function evaluateAgari(ctx: AgariContext): AgariResult | null {
 
   // 国士（役满；13 面听双倍）
   if (isKokushi(c14, all)) {
-    const thirteenWait = ctx.juntehai.length === 13 && isKokushi(countsOf(ctx.juntehai), ctx.juntehai);
+    // ★ 13 面听 = 手牌 13 张且 13 种幺九各 1 张（无对子）——此前用 isKokushi 判定恒 false
+    const thirteenWait =
+      ctx.juntehai.length === 13 &&
+      new Set(ctx.juntehai).size === 13 &&
+      ctx.juntehai.every(isYaochuupai);
     return {
       yaku: [],
       hanTotal: 0,
@@ -262,10 +266,15 @@ function collectYaku(ctx: YakuContext): AgariYaku[] {
 
 function calcFu(ctx: AgariContext, decomps: WinDecomp[]): number {
   let fu = 20; // 副底
-  // 面子符
+  // 面子符：手牌里的刻子原则上都是暗刻（幺九 8 / 中张 4），
+  // 例外：荣和补成的那组刻子按明刻（幺九 4 / 中张 2）——见「双碰荣和」
   for (const d of decomps[0].mentsu) {
     const yaochuu = isYaochuupai(d.anchor);
-    if (d.kind === 'koutsu') fu += yaochuu ? 4 : 2;
+    if (d.kind === 'koutsu') {
+      const ronCompleted = !ctx.isTsumo && d.anchor === ctx.agariPai;
+      if (ronCompleted) fu += yaochuu ? 4 : 2;
+      else fu += yaochuu ? 8 : 4;
+    }
   }
   for (const f of ctx.fuuro) {
     const anchor = Math.min(...f.tiles);
@@ -274,8 +283,8 @@ function calcFu(ctx: AgariContext, decomps: WinDecomp[]): number {
       case 'chii': break;
       case 'pon': fu += yaochuu ? 4 : 2; break;
       case 'kan':
-      case 'kakan':
-      case 'ankan': fu += yaochuu ? 16 : 8; break;
+      case 'kakan': fu += yaochuu ? 16 : 8; break;
+      case 'ankan': fu += yaochuu ? 32 : 16; break; // 暗杠（幺九 32 / 中张 16）
     }
   }
   // 雀头符

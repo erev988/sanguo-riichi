@@ -58,7 +58,7 @@ describe('和牌判定 evaluateAgari（agari.ls 转写）', () => {
     expect(r!.fu).toBe(25);
   });
 
-  it('国士：13 种幺九 + 白 → 役满国士无双', () => {
+  it('国士：13 种幺九各 1 张（十三面听）→ 国士无双 双倍役满', () => {
     const ctx = makeAgari({
       juntehai: [1, 9, 11, 19, 21, 29, 31, 32, 33, 34, 35, 36, 37],
       agariPai: 1, // 荣和 1m
@@ -67,7 +67,8 @@ describe('和牌判定 evaluateAgari（agari.ls 转写）', () => {
     const r = evaluateAgari(ctx);
     expect(r).not.toBeNull();
     expect(r!.yakuman.map((y) => y.name)).toContain('国士无双');
-    expect(r!.yakumanTotal).toBe(1);
+    // 13 张 13 种幺九 = 十三面听，规则为双倍役满（此前误判 1 倍，因 isKokushi 要求 pairs===1 恒 false）
+    expect(r!.yakumanTotal).toBe(2);
   });
 
   it('无役不可和：123m456m789p456p南南，荣和南 → null', () => {

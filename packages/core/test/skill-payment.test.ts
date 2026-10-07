@@ -192,8 +192,8 @@ describe('陈到「往烈」：被鸣走则减少支付', () => {
     const before = s.players.map((p) => p.score);
     const r = step(s, { type: 'ron', player: 1, tile: 35, from: 0 }, { skillsOf: WANGLIE });
     expect(r.error).toBeFalsy();
-    // 原支付 1300（40符1番）- 往烈 1000 = 300
-    expect(before[0] - r.state.players[0].score).toBe(300);
+    // 支付 1600（50符1番：發为幺九暗刻 8 符，旧实现误按明刻 4 符算成 40 符）- 往烈 1000 = 600
+    expect(before[0] - r.state.players[0].score).toBe(600);
   });
 
   it('被鸣走 3 张 → 支付减 3000，仍不低于 0', () => {
@@ -213,7 +213,7 @@ describe('陈到「往烈」：被鸣走则减少支付', () => {
     s.lastDiscard = { player: 0, tile: 35 };
     const before = s.players.map((p) => p.score);
     const r = step(s, { type: 'ron', player: 1, tile: 35, from: 0 }, { skillsOf: WANGLIE });
-    expect(before[0] - r.state.players[0].score).toBe(1300); // 正常支付（40符1番）
+    expect(before[0] - r.state.players[0].score).toBe(1600); // 正常支付（50符1番：發为幺九暗刻）
   });
 
   it('流局罚符同样减免（被鸣走 1 张 → 亲不听 2000 减到 1000）', () => {

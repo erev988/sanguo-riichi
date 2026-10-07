@@ -72,8 +72,13 @@ export interface YakuDef {
 }
 
 /** 手牌（不含副露）拆法里的暗刻数 */
-function countAnko(decomp: { mentsu: MentsuDecomp[] }): number {
-  return decomp.mentsu.filter((m) => m.kind === 'koutsu').length;
+function countAnko(ctx: YakuContext, decomp: { mentsu: MentsuDecomp[] }): number {
+  return decomp.mentsu.filter((m) => {
+    if (m.kind !== 'koutsu') return false;
+    // ★ 荣和补成的那组刻子规则上算明刻（双碰荣和 → 四暗刻降为三暗刻）
+    if (!ctx.isTsumo && m.anchor === ctx.agariPai) return false;
+    return true;
+  }).length;
 }
 
 function anyDecomp(ctx: YakuContext, f: (d: { mentsu: MentsuDecomp[]; jantou: Tile }) => boolean): boolean {
@@ -166,7 +171,7 @@ export const YAKU_LIST: YakuDef[] = [
     menzenHan: 2,
     kuiHan: 2,
     shadows: ['三色同顺', '一气通贯'],
-    predicate: (ctx) => ctx.decomp.some((d) => countAnko(d) === 3),
+    predicate: (ctx) => ctx.decomp.some((d) => countAnko(ctx, d) === 3),
   },
   {
     name: '对对和',
@@ -312,11 +317,11 @@ export const YAKUMAN_LIST: YakuDef[] = [
     shadows: ['四暗刻'],
     predicate: (ctx) =>
       ctx.menzen &&
-      ctx.decomp.some((d) => countAnko(d) === 4 && d.jantou === ctx.agariPai),
+      ctx.decomp.some((d) => countAnko(ctx, d) === 4 && d.jantou === ctx.agariPai),
   },
   {
     name: '四暗刻',
-    predicate: (ctx) => ctx.menzen && ctx.decomp.some((d) => countAnko(d) === 4),
+    predicate: (ctx) => ctx.menzen && ctx.decomp.some((d) => countAnko(ctx, d) === 4),
   },
   // 国士无双在 agari 流程中单独判定（kokushi 标志）
 ];

@@ -946,7 +946,12 @@ function winFromState(
     rinshan: kind === 'tsumo' && s.rinshan,
     chankan,
     isHaitei: s.isHaitei,
-    virgin: s.turnCount === 0,
+    // ★ 天和/地和：自己还没打过牌 + 无人鸣牌打断
+    //   天和 = 庄家开局首巡；地和 = 子家自己的第一巡（此时庄家已摸打过一次，turnCount 为 1）
+    virgin:
+      s.players[seat].log.discards === 0 &&
+      s.players.every((x) => x.openMelds.length === 0) &&
+      (seat === s.dealer ? s.turnCount === 0 : s.turnCount <= 1),
     agariPlayer: seat,
     chancha: s.dealer,
     bakaze: WIND_TILE[s.round.wind], // 场风由局信息决定
