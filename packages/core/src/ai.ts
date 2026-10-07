@@ -83,12 +83,3 @@ function isolation(hand: Tile[], t: Tile): number {
 }
 
 /** 有效牌种类数（进张），供将来更强的打牌选择使用 */
-export function ukeireKinds(hand: Tile[], melds: Meld[] = []): number {
-  const base = shanten(hand, melds);
-  let n = 0;
-  for (const t of ALL_TILES) {
-    if (hand.filter((x) => x === t).length >= 4) continue;
-    if (shanten([...hand, t], melds) < base) n++;
-  }
-  return n;
-}

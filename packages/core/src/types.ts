@@ -10,10 +10,10 @@ import type { Rules } from './rules';
 
 export type Suit = 'man' | 'pin' | 'sou' | 'honor' | 'null';export type Tile = number;
 
-export const MAN_BASE = 0;
-export const PIN_BASE = 10;
-export const SOU_BASE = 20;
-export const HONOR_BASE = 31;
+const MAN_BASE = 0;
+const PIN_BASE = 10;
+const SOU_BASE = 20;
+const HONOR_BASE = 31;
 
 const HONOR_NAMES = ['東', '南', '西', '北', '白', '發', '中'];
 
@@ -25,7 +25,7 @@ export function suitOf(t: Tile): Suit {
   return 'null'; // 30
 }
 
-export function rankOf(t: Tile): number {
+function rankOf(t: Tile): number {
   const r = t % 10;
   return r === 0 ? 5 : r; // 赤5 视为 5
 }
@@ -34,11 +34,11 @@ export function isMan(t: Tile): boolean {
   return t <= 9;
 }
 
-export function isHonor(t: Tile): boolean {
+function isHonor(t: Tile): boolean {
   return t >= HONOR_BASE;
 }
 
-export function isAka(t: Tile): boolean {
+function isAka(t: Tile): boolean {
   return t === 0 || t === 10 || t === 20;
 }
 
